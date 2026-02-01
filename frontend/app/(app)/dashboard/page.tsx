@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { AppShell } from '@/components/app/shell';
+import { StudentQuickSearch } from '@/components/app/student-quick-search';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { apiFetch } from '@/lib/api';
@@ -29,28 +30,31 @@ export default function DashboardPage() {
       ) : summary.isError ? (
         <div className="text-sm text-red-600">Failed to load summary</div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle>Today Collected</CardTitle>
-            </CardHeader>
-            <CardContent className="text-2xl font-semibold">{summary.data?.today_total}</CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>This Month Collected</CardTitle>
-            </CardHeader>
-            <CardContent className="text-2xl font-semibold">{summary.data?.month_total}</CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Total Pending</CardTitle>
-            </CardHeader>
-            <CardContent className="text-2xl font-semibold">{summary.data?.pending_total}</CardContent>
-          </Card>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader>
+                <CardTitle>Today Collected</CardTitle>
+              </CardHeader>
+              <CardContent className="text-2xl font-semibold">{summary.data?.today_total}</CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>This Month Collected</CardTitle>
+              </CardHeader>
+              <CardContent className="text-2xl font-semibold">{summary.data?.month_total}</CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Total Pending</CardTitle>
+              </CardHeader>
+              <CardContent className="text-2xl font-semibold">{summary.data?.pending_total}</CardContent>
+            </Card>
+          </div>
+
+          <StudentQuickSearch />
         </div>
       )}
     </AppShell>
   );
 }
-

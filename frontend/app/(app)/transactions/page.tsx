@@ -11,6 +11,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Table, TBody, TD, TH, THead } from '@/components/ui/table';
 import { apiFetch } from '@/lib/api';
 import { debounce } from '@/lib/debounce';
+import { ReversePaymentDialog, type PaymentRow } from '@/components/app/reverse-payment-dialog';
 
 type Payment = {
   id: string;
@@ -28,15 +29,20 @@ export default function TransactionsPage() {
   const [mode, setMode] = useState('');
   const [receipt, setReceipt] = useState('');
   const [debouncedReceipt, setDebouncedReceipt] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
+
+  const [reverseOpen, setReverseOpen] = useState(false);
+  const [reversePayment, setReversePayment] = useState<PaymentRow | null>(null);
 
   const setReceiptDebounced = useMemo(() => debounce((v: string) => setDebouncedReceipt(v), 250), []);
 
   const q = useQuery({
-    queryKey: ['payments', from, to, mode, debouncedReceipt],
+    queryKey: ['payments', from, to, mode, debouncedReceipt, page],
     queryFn: () => {
       const params = new URLSearchParams();
-      params.set('page', '1');
-      params.set('page_size', '200');
+      params.set('page', String(page));
+      params.set('page_size', String(pageSize));
       if (from) params.set('from', new Date(from).toISOString());
       if (to) params.set('to', new Date(to).toISOString());
       if (mode) params.set('mode', mode);
@@ -44,6 +50,8 @@ export default function TransactionsPage() {
       return apiFetch<{ items: Payment[]; total: number }>(`/payments?${params.toString()}`);
     }
   });
+
+  const totalPages = q.data ? Math.max(1, Math.ceil(q.data.total / pageSize)) : 1;
 
   return (
     <AppShell title="Transactions">
@@ -64,7 +72,10 @@ export default function TransactionsPage() {
                 <select
                   className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm"
                   value={mode}
-                  onChange={(e) => setMode(e.target.value)}
+                  onChange={(e) => {
+                    setMode(e.target.value);
+                    setPage(1);
+                  }}
                 >
                   <option value="">All</option>
                   <option value="cash">Cash</option>
@@ -79,6 +90,7 @@ export default function TransactionsPage() {
                   onChange={(e) => {
                     setReceipt(e.target.value);
                     setReceiptDebounced(e.target.value);
+                    setPage(1);
                   }}
                   placeholder="FEE-123"
                   className="w-[200px]"
@@ -106,12 +118,13 @@ export default function TransactionsPage() {
                   <TH>Mode</TH>
                   <TH>Amount</TH>
                   <TH>Notes</TH>
+                  <TH></TH>
                 </tr>
               </THead>
               <TBody>
                 {q.isLoading ? (
                   <tr>
-                    <TD colSpan={5}>
+                    <TD colSpan={6}>
                       <div className="flex items-center gap-2 text-sm text-slate-600">
                         <Spinner /> Loading
                       </div>
@@ -119,7 +132,7 @@ export default function TransactionsPage() {
                   </tr>
                 ) : q.isError ? (
                   <tr>
-                    <TD colSpan={5} className="text-sm text-red-600">Failed to load</TD>
+                    <TD colSpan={6} className="text-sm text-red-600">Failed to load</TD>
                   </tr>
                 ) : (
                   q.data?.items.map((p) => (
@@ -131,14 +144,52 @@ export default function TransactionsPage() {
                       <TD className="max-w-[520px] truncate" title={p.notes ?? ''}>
                         {p.notes ?? ''}
                       </TD>
+                      <TD>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setReversePayment({ id: p.id, receipt_no: p.receipt_no, amount: p.amount, mode: p.mode });
+                            setReverseOpen(true);
+                          }}
+                        >
+                          Reverse
+                        </Button>
+                      </TD>
                     </tr>
                   ))
                 )}
               </TBody>
             </Table>
           </div>
+
+          <div className="mt-3 flex items-center justify-between">
+            <div className="text-sm text-slate-600">
+              Page {page} / {totalPages}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                Prev
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
+
+      <ReversePaymentDialog
+        open={reverseOpen}
+        onOpenChange={setReverseOpen}
+        payment={reversePayment}
+        onSuccess={() => q.refetch()}
+      />
     </AppShell>
   );
 }

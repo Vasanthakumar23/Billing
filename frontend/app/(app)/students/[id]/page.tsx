@@ -17,6 +17,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Table, TBody, TD, TH, THead } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toaster';
 import { apiFetch } from '@/lib/api';
+import { ReversePaymentDialog, type PaymentRow } from '@/components/app/reverse-payment-dialog';
 
 type Student = {
   id: string;
@@ -58,6 +59,11 @@ export default function StudentDetailPage() {
   const qc = useQueryClient();
   const [feeOpen, setFeeOpen] = useState(false);
   const [inactiveOpen, setInactiveOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 25;
+
+  const [reverseOpen, setReverseOpen] = useState(false);
+  const [reversePayment, setReversePayment] = useState<PaymentRow | null>(null);
 
   const feeSchema = z.object({ expected_fee_amount: z.coerce.number().min(0) });
   const feeForm = useForm<{ expected_fee_amount: number }>({
@@ -69,9 +75,11 @@ export default function StudentDetailPage() {
   const fee = useQuery({ queryKey: ['studentFee', id], queryFn: () => apiFetch<Fee>(`/students/${id}/fee`) });
   const balance = useQuery({ queryKey: ['studentBalance', id], queryFn: () => apiFetch<Balance>(`/students/${id}/balance`) });
   const payments = useQuery({
-    queryKey: ['payments', id],
-    queryFn: () => apiFetch<{ items: Payment[]; total: number }>(`/payments?student_id=${id}&page=1&page_size=100`)
+    queryKey: ['payments', id, page],
+    queryFn: () => apiFetch<{ items: Payment[]; total: number }>(`/payments?student_id=${id}&page=${page}&page_size=${pageSize}`)
   });
+
+  const paymentTotalPages = payments.data ? Math.max(1, Math.ceil(payments.data.total / pageSize)) : 1;
 
   const updateFee = useMutation({
     mutationFn: (values: { expected_fee_amount: number }) =>
@@ -162,6 +170,13 @@ export default function StudentDetailPage() {
                 Mark Inactive
               </Button>
             ) : null}
+
+            <Button
+              variant="outline"
+              onClick={() => window.location.assign(`/api/backend/export/payments.csv?student_id=${id}`)}
+            >
+              Export Payments CSV
+            </Button>
           </div>
 
           <Card>
@@ -178,12 +193,13 @@ export default function StudentDetailPage() {
                       <TH>Mode</TH>
                       <TH>Amount</TH>
                       <TH>Notes</TH>
+                      <TH></TH>
                     </tr>
                   </THead>
                   <TBody>
                     {payments.isLoading ? (
                       <tr>
-                        <TD colSpan={5}>
+                        <TD colSpan={6}>
                           <div className="flex items-center gap-2 text-sm text-slate-600">
                             <Spinner /> Loading
                           </div>
@@ -191,7 +207,7 @@ export default function StudentDetailPage() {
                       </tr>
                     ) : payments.isError ? (
                       <tr>
-                        <TD colSpan={5} className="text-sm text-red-600">
+                        <TD colSpan={6} className="text-sm text-red-600">
                           Failed to load payments
                         </TD>
                       </tr>
@@ -205,17 +221,48 @@ export default function StudentDetailPage() {
                           <TD className="max-w-[420px] truncate" title={p.notes ?? ''}>
                             {p.notes ?? ''}
                           </TD>
+                          <TD>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setReversePayment({ id: p.id, receipt_no: p.receipt_no, amount: p.amount, mode: p.mode });
+                                setReverseOpen(true);
+                              }}
+                            >
+                              Reverse
+                            </Button>
+                          </TD>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <TD colSpan={5} className="text-sm text-slate-600">
+                        <TD colSpan={6} className="text-sm text-slate-600">
                           No payments
                         </TD>
                       </tr>
                     )}
                   </TBody>
                 </Table>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between">
+                <div className="text-sm text-slate-600">
+                  Page {page} / {paymentTotalPages}
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                    Prev
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= paymentTotalPages}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -272,6 +319,16 @@ export default function StudentDetailPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          <ReversePaymentDialog
+            open={reverseOpen}
+            onOpenChange={setReverseOpen}
+            payment={reversePayment}
+            onSuccess={() => {
+              payments.refetch();
+              balance.refetch();
+            }}
+          />
         </div>
       )}
     </AppShell>
