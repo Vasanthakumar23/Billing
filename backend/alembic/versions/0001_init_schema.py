@@ -13,6 +13,7 @@ import uuid
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 from passlib.context import CryptContext
 
 
@@ -23,12 +24,48 @@ depends_on = None
 
 
 def upgrade() -> None:
-    user_role = sa.Enum("admin", name="user_role")
-    student_status = sa.Enum("active", "inactive", name="student_status")
-    payment_mode = sa.Enum("cash", "upi", "bank", name="payment_mode")
-    user_role.create(op.get_bind(), checkfirst=True)
-    student_status.create(op.get_bind(), checkfirst=True)
-    payment_mode.create(op.get_bind(), checkfirst=True)
+    # Postgres ENUM types don't support CREATE TYPE IF NOT EXISTS.
+    # Use a DO block so reruns (or partially-provisioned DBs) don't error.
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            CREATE TYPE user_role AS ENUM ('admin');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+        """
+    )
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            CREATE TYPE student_status AS ENUM ('active', 'inactive');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+        """
+    )
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            CREATE TYPE payment_mode AS ENUM ('cash', 'upi', 'bank');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+        """
+    )
+
+    # Use dialect ENUM with create_type=False so SQLAlchemy doesn't emit CREATE TYPE
+    # during table creation (we handle type creation above).
+    user_role = postgresql.ENUM("admin", name="user_role", create_type=False)
+    student_status = postgresql.ENUM(
+        "active", "inactive", name="student_status", create_type=False
+    )
+    payment_mode = postgresql.ENUM(
+        "cash", "upi", "bank", name="payment_mode", create_type=False
+    )
 
     op.create_table(
         "users",
