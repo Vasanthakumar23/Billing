@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal, InvalidOperation
+from io import BytesIO
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
+from fastapi import File as FastAPIFile
+from openpyxl import load_workbook
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
@@ -26,6 +31,199 @@ from app.schemas.students import (
 
 
 router = APIRouter()
+
+_HEADER_RE = re.compile(r"[^a-z0-9]+")
+
+
+def _normalize_header(value: object) -> str:
+    if value is None:
+        return ""
+    s = str(value).strip().lower()
+    s = _HEADER_RE.sub("", s)
+    return s
+
+
+def _find_col(headers: dict[str, int], keys: list[str]) -> int | None:
+    for key in keys:
+        idx = headers.get(key)
+        if idx is not None:
+            return idx
+    return None
+
+
+def _to_student_code(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
+
+
+def _to_decimal(value: object) -> Decimal | None:
+    if value is None:
+        return None
+    if isinstance(value, Decimal):
+        return value
+    if isinstance(value, (int, float)):
+        return Decimal(str(value))
+    s = str(value).strip()
+    if s == "":
+        return None
+    return Decimal(s)
+
+
+@router.post("/import", response_model=dict)
+async def import_students_from_excel(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    file: UploadFile = FastAPIFile(...),
+    mode: str = Query("upsert", pattern="^(upsert|create_only)$"),
+    atomic: bool = Query(True),
+) -> dict:
+    filename = (file.filename or "").lower()
+    if not filename.endswith(".xlsx"):
+        raise HTTPException(status_code=415, detail="Only .xlsx files are supported")
+
+    data = await file.read()
+    try:
+        wb = load_workbook(BytesIO(data), data_only=True, read_only=True)
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid Excel file")
+
+    ws = wb.worksheets[0]
+    rows = ws.iter_rows(values_only=True)
+    try:
+        header_row = next(rows)
+    except StopIteration:
+        raise HTTPException(status_code=422, detail="Excel file is empty")
+
+    headers: dict[str, int] = {}
+    for idx, value in enumerate(header_row):
+        key = _normalize_header(value)
+        if key and key not in headers:
+            headers[key] = idx
+
+    student_code_col = _find_col(
+        headers,
+        [
+            "studentcode",
+            "studentid",
+            "rollno",
+            "rollnumber",
+            "roll",
+            "id",
+        ],
+    )
+    name_col = _find_col(headers, ["name", "studentname"])
+    class_col = _find_col(headers, ["classname", "class", "std", "standard"])
+    section_col = _find_col(headers, ["section", "sec"])
+    fee_col = _find_col(headers, ["expectedfeeamount", "expectedfee", "fee", "fees"])
+
+    missing = []
+    if student_code_col is None:
+        missing.append("student_code/rollno")
+    if name_col is None:
+        missing.append("name")
+    if missing:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Missing required columns: {', '.join(missing)}",
+        )
+
+    created = 0
+    updated = 0
+    fee_updated = 0
+    errors: list[dict] = []
+
+    # We process and write in one pass; if atomic=True we roll back on any error.
+    try:
+        for row_index, row in enumerate(rows, start=2):
+            def cell(col: int | None) -> object:
+                if col is None:
+                    return None
+                return row[col] if col < len(row) else None
+
+            student_code = _to_student_code(cell(student_code_col))
+            name_val = (cell(name_col) if name_col is not None else None)
+            name = "" if name_val is None else str(name_val).strip()
+            class_name = None
+            if class_col is not None:
+                v = cell(class_col)
+                class_name = None if v is None or str(v).strip() == "" else str(v).strip()
+            section = None
+            if section_col is not None:
+                v = cell(section_col)
+                section = None if v is None or str(v).strip() == "" else str(v).strip()
+
+            fee_cell = cell(fee_col) if fee_col is not None else None
+            fee_cell_empty = fee_cell is None or str(fee_cell).strip() == ""
+            if student_code == "" and name == "" and (class_name is None) and (section is None) and fee_cell_empty:
+                continue  # empty-ish row
+
+            if student_code == "":
+                errors.append({"row": row_index, "error": "student_code/rollno is required"})
+                continue
+            if name == "":
+                errors.append({"row": row_index, "error": "name is required"})
+                continue
+
+            try:
+                fee = _to_decimal(cell(fee_col)) if fee_col is not None else None
+            except (InvalidOperation, ValueError):
+                errors.append({"row": row_index, "error": "fees must be a number"})
+                continue
+            if fee is None:
+                fee = Decimal("0")
+            if fee < 0:
+                errors.append({"row": row_index, "error": "fees must be >= 0"})
+                continue
+
+            student = db.execute(select(Student).where(Student.student_code == student_code)).scalar_one_or_none()
+            if student:
+                if mode == "create_only":
+                    errors.append({"row": row_index, "error": f"student_code '{student_code}' already exists"})
+                    continue
+                student.name = name
+                student.class_name = class_name
+                student.section = section
+                updated += 1
+            else:
+                student = Student(
+                    student_code=student_code,
+                    name=name,
+                    class_name=class_name,
+                    section=section,
+                )
+                db.add(student)
+                db.flush()
+                created += 1
+
+            fee_row = db.get(StudentFee, student.id)
+            if not fee_row:
+                fee_row = StudentFee(student_id=student.id)
+                db.add(fee_row)
+            fee_row.expected_fee_amount = fee
+            fee_row.last_fee_updated_at = datetime.now(UTC)
+            fee_row.last_fee_updated_by = current_user.id
+            fee_updated += 1
+
+        if errors and atomic:
+            db.rollback()
+            raise HTTPException(status_code=422, detail={"errors": errors})
+
+        db.commit()
+    except HTTPException:
+        raise
+    except Exception:
+        db.rollback()
+        raise
+
+    return {
+        "created": created,
+        "updated": updated,
+        "fee_updated": fee_updated,
+        "errors": errors,
+    }
 
 
 @router.get("", response_model=dict)

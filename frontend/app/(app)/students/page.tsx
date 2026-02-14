@@ -48,6 +48,9 @@ export default function StudentsPage() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<'all' | 'active' | 'inactive'>('active');
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importMode, setImportMode] = useState<'upsert' | 'create_only'>('upsert');
 
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -78,6 +81,32 @@ export default function StudentsPage() {
     onError: (e) => toast({ title: 'Create failed', description: String(e) })
   });
 
+  const importStudents = useMutation({
+    mutationFn: async () => {
+      if (!importFile) throw new Error('Please choose an .xlsx file');
+      const fd = new FormData();
+      fd.append('file', importFile);
+
+      const res = await fetch(`/api/backend/students/import?mode=${encodeURIComponent(importMode)}`, {
+        method: 'POST',
+        body: fd
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.detail ? JSON.stringify(data.detail) : 'Import failed');
+      return data as { created: number; updated: number; fee_updated: number };
+    },
+    onSuccess: (data) => {
+      toast({
+        title: 'Import completed',
+        description: `Created: ${data.created}, Updated: ${data.updated}, Fee updated: ${data.fee_updated}`
+      });
+      setImportOpen(false);
+      setImportFile(null);
+      qc.invalidateQueries({ queryKey: ['students'] });
+    },
+    onError: (e) => toast({ title: 'Import failed', description: String(e) })
+  });
+
   const totalPages = query.data ? Math.max(1, Math.ceil(query.data.total / 25)) : 1;
 
   return (
@@ -103,6 +132,9 @@ export default function StudentsPage() {
               </select>
               <Button variant="outline" onClick={() => setCreateOpen(true)}>
                 Add Student
+              </Button>
+              <Button variant="outline" onClick={() => setImportOpen(true)}>
+                Import Excel
               </Button>
               <Button variant="outline" onClick={() => window.location.assign('/api/backend/export/students.csv')}>
                 Export CSV
@@ -231,6 +263,65 @@ export default function StudentsPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={importOpen}
+        onOpenChange={(v) => {
+          setImportOpen(v);
+          if (!v) {
+            setImportFile(null);
+            setImportMode('upsert');
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import Students (Excel)</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <div className="space-y-3">
+              <div className="text-sm text-slate-600">
+                Upload an <span className="font-medium text-slate-900">.xlsx</span> with columns like:{' '}
+                <span className="font-medium text-slate-900">rollno/student_code</span>,{' '}
+                <span className="font-medium text-slate-900">name</span>,{' '}
+                <span className="font-medium text-slate-900">std/class</span>,{' '}
+                <span className="font-medium text-slate-900">section</span>,{' '}
+                <span className="font-medium text-slate-900">fees</span>.
+              </div>
+
+              <div>
+                <div className="mb-1 text-sm text-slate-600">Mode</div>
+                <select
+                  className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                  value={importMode}
+                  onChange={(e) => setImportMode(e.target.value as any)}
+                >
+                  <option value="upsert">Upsert (create or update)</option>
+                  <option value="create_only">Create only (error if exists)</option>
+                </select>
+              </div>
+
+              <div>
+                <div className="mb-1 text-sm text-slate-600">Excel file</div>
+                <input
+                  type="file"
+                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                />
+              </div>
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setImportOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => importStudents.mutate()} disabled={importStudents.isPending || !importFile}>
+              {importStudents.isPending ? <Spinner className="mr-2" /> : null}
+              Import
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </AppShell>

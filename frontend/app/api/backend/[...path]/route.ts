@@ -1,6 +1,8 @@
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
+export const runtime = 'nodejs';
+
 function backendBaseUrl() {
   return (
     process.env.BACKEND_API_BASE_URL ??
@@ -20,18 +22,21 @@ async function handler(req: NextRequest, ctx: { params: { path: string[] } }) {
   const headers = new Headers(req.headers);
   headers.set('Authorization', `Bearer ${token}`);
   headers.delete('host');
+  headers.delete('content-length');
+
+  const reqBody = req.method === 'GET' || req.method === 'HEAD' ? undefined : await req.arrayBuffer();
 
   const res = await fetch(target, {
     method: req.method,
     headers,
-    body: req.method === 'GET' || req.method === 'HEAD' ? undefined : await req.text()
+    body: reqBody
   });
 
   const contentType = res.headers.get('content-type') ?? '';
   const isJson = contentType.includes('application/json');
-  const body = isJson ? await res.text() : await res.arrayBuffer();
+  const resBody = isJson ? await res.text() : await res.arrayBuffer();
 
-  const out = new NextResponse(body as any, { status: res.status });
+  const out = new NextResponse(resBody as any, { status: res.status });
   res.headers.forEach((v, k) => {
     if (k.toLowerCase() === 'transfer-encoding') return;
     out.headers.set(k, v);
@@ -44,4 +49,3 @@ export const POST = handler;
 export const PATCH = handler;
 export const PUT = handler;
 export const DELETE = handler;
-

@@ -1,4 +1,5 @@
 from decimal import Decimal
+from io import BytesIO
 
 from .conftest import auth_header
 
@@ -106,3 +107,33 @@ def test_pending_calculation_correct(client):
     row = next(r for r in rows if r["student_code"] == "S004")
     assert Decimal(row["pending"]) == Decimal("600")
 
+
+def test_import_students_from_excel(client):
+    from openpyxl import Workbook
+
+    headers = auth_header(client)
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["rollno", "name", "std", "section", "fees"])
+    ws.append(["S010", "Eve", "10", "B", 1200])
+    ws.append(["S011", "Frank", "9", "A", "900.50"])
+    buf = BytesIO()
+    wb.save(buf)
+    payload = buf.getvalue()
+
+    resp = client.post(
+        "/api/students/import",
+        headers=headers,
+        files={
+            "file": (
+                "students.xlsx",
+                payload,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["created"] == 2
+    assert data["updated"] == 0
+    assert data["fee_updated"] == 2
