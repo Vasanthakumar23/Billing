@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,14 @@ from app.models.receipt_sequence import ReceiptSequence
 from app.models.student import Student
 from app.models.user import User
 from app.schemas.payments import PaymentCreate, PaymentRead, PaymentReverseRequest
+from app.services.billing import (
+    assign_periods_to_payment,
+    cycle_months_for,
+    fee_period_label,
+    get_billing_settings,
+    get_student_monthly_fee,
+    release_payment_periods,
+)
 
 
 router = APIRouter()
@@ -47,28 +55,39 @@ def create_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> PaymentRead:
-    if payload.amount == 0:
-        raise HTTPException(status_code=422, detail="amount must be non-zero")
-
     student = db.get(Student, payload.student_id)
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
+
+    settings = get_billing_settings(db)
+    cycle_months = cycle_months_for(settings.cycle_mode)
+    monthly_fee = get_student_monthly_fee(db, student.id)
+    amount = monthly_fee * Decimal(cycle_months)
+    if amount == 0:
+        raise HTTPException(status_code=422, detail="Monthly fee must be greater than zero")
 
     receipt_no = _generate_receipt_no(db)
     payment = Payment(
         receipt_no=receipt_no,
         student_id=payload.student_id,
-        amount=payload.amount,
+        amount=amount,
         mode=payload.mode,
         reference_no=payload.reference_no,
         notes=payload.notes,
+        billing_start_month=payload.billing_start_month,
+        billing_cycle_months=cycle_months,
         paid_at=payload.paid_at or datetime.now(UTC),
         created_by=current_user.id,
     )
     db.add(payment)
-    db.commit()
+    try:
+        assign_periods_to_payment(db, payment, payload.billing_start_month, cycle_months)
+        db.commit()
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc))
     db.refresh(payment)
-    return PaymentRead.model_validate(payment)
+    return _payment_read(payment)
 
 
 @router.get("", response_model=dict)
@@ -105,7 +124,7 @@ def list_payments(
         .scalars()
         .all()
     )
-    return {"items": [PaymentRead.model_validate(p) for p in items], "total": total}
+    return {"items": [_payment_read(p) for p in items], "total": total}
 
 
 @router.post("/{payment_id}/reverse", response_model=PaymentRead, status_code=201)
@@ -139,10 +158,111 @@ def reverse_payment(
         mode=original.mode,
         reference_no=original.reference_no,
         notes=notes,
+        billing_start_month=original.billing_start_month,
+        billing_cycle_months=original.billing_cycle_months,
         paid_at=datetime.now(UTC),
         created_by=current_user.id,
     )
     db.add(reversal)
+    release_payment_periods(original)
     db.commit()
     db.refresh(reversal)
-    return PaymentRead.model_validate(reversal)
+    return _payment_read(reversal)
+
+
+@router.get("/{payment_id}/receipt", response_model=PaymentRead)
+def get_payment_receipt(
+    payment_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> PaymentRead:
+    payment = db.get(Payment, payment_id)
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    return _payment_read(payment)
+
+
+@router.get("/{payment_id}/receipt.pdf")
+def download_receipt_pdf(
+    payment_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> Response:
+    payment = db.get(Payment, payment_id)
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    student = db.get(Student, payment.student_id)
+    period_label = fee_period_label(payment.billing_start_month, payment.billing_cycle_months) or "N/A"
+    pdf = _render_receipt_pdf(
+        receipt_no=payment.receipt_no,
+        student_name=student.name if student else "Unknown Student",
+        fee_period=period_label,
+        amount=str(payment.amount),
+        payment_date=payment.paid_at.strftime("%Y-%m-%d %H:%M:%S UTC"),
+        payment_reference=payment.reference_no or "-",
+    )
+    headers = {"Content-Disposition": f'attachment; filename="{payment.receipt_no}.pdf"'}
+    return Response(content=pdf, media_type="application/pdf", headers=headers)
+
+
+def _payment_read(payment: Payment) -> PaymentRead:
+    data = PaymentRead.model_validate(payment).model_dump()
+    data["student_name"] = payment.student.name if payment.student else None
+    data["student_code"] = payment.student.student_code if payment.student else None
+    data["fee_period_label"] = fee_period_label(payment.billing_start_month, payment.billing_cycle_months)
+    return PaymentRead.model_validate(data)
+
+
+def _render_receipt_pdf(
+    *,
+    receipt_no: str,
+    student_name: str,
+    fee_period: str,
+    amount: str,
+    payment_date: str,
+    payment_reference: str,
+) -> bytes:
+    lines = [
+        "Institution Billing Receipt",
+        f"Receipt: {receipt_no}",
+        f"Student: {student_name}",
+        f"Fee Period: {fee_period}",
+        f"Amount Paid: {amount}",
+        f"Payment Date: {payment_date}",
+        f"Reference: {payment_reference}",
+    ]
+    escaped = [line.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)") for line in lines]
+    content = ["BT", "/F1 18 Tf", "50 780 Td"]
+    for index, line in enumerate(escaped):
+        if index == 0:
+            content.append(f"({line}) Tj")
+        else:
+            content.append("0 -28 Td")
+            content.append("/F1 12 Tf")
+            content.append(f"({line}) Tj")
+    content.append("ET")
+    stream = "\n".join(content).encode("ascii")
+    objects: list[bytes] = []
+    objects.append(b"1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n")
+    objects.append(b"2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n")
+    objects.append(
+        b"3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+        b"/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj\n"
+    )
+    objects.append(b"4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n")
+    objects.append(f"5 0 obj << /Length {len(stream)} >> stream\n".encode("ascii") + stream + b"\nendstream endobj\n")
+
+    pdf = bytearray(b"%PDF-1.4\n")
+    offsets = [0]
+    for obj in objects:
+        offsets.append(len(pdf))
+        pdf.extend(obj)
+    xref_start = len(pdf)
+    pdf.extend(f"xref\n0 {len(offsets)}\n".encode("ascii"))
+    pdf.extend(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        pdf.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
+    pdf.extend(
+        f"trailer << /Size {len(offsets)} /Root 1 0 R >>\nstartxref\n{xref_start}\n%%EOF".encode("ascii")
+    )
+    return bytes(pdf)

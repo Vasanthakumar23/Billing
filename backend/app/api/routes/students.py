@@ -6,21 +6,23 @@ from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile
 from fastapi import File as FastAPIFile
 from openpyxl import load_workbook
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_admin_user
 from app.core.database import get_db
+from app.models.payment import Payment
 from app.models.student import Student
-from app.models.student_balance_view import StudentBalanceView
 from app.models.student_fee import StudentFee
 from app.models.user import User
 from app.models.enums import StudentStatus
 from app.schemas.students import (
     StudentCreate,
+    StudentBillingMonthStatus,
+    StudentBillingOverviewRead,
     StudentListItem,
     StudentBalanceRead,
     StudentFeeRead,
@@ -28,6 +30,7 @@ from app.schemas.students import (
     StudentRead,
     StudentUpdate,
 )
+from app.services.billing import get_student_billing_overview, month_label, pending_amount
 
 
 router = APIRouter()
@@ -275,20 +278,7 @@ def list_student_balances(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
 ) -> dict:
-    stmt = (
-        select(
-            Student.id,
-            Student.student_code,
-            Student.name,
-            Student.class_name,
-            Student.section,
-            Student.status,
-            StudentBalanceView.expected_fee,
-            StudentBalanceView.paid_total,
-            StudentBalanceView.pending,
-        )
-        .join(StudentBalanceView, StudentBalanceView.student_id == Student.id)
-    )
+    stmt = select(Student)
 
     if search:
         s = f"%{search.lower()}%"
@@ -309,22 +299,28 @@ def list_student_balances(
             .offset((page - 1) * page_size)
             .limit(page_size)
         )
+        .scalars()
         .all()
     )
-    items = [
-        StudentListItem(
-            id=r.id,
-            student_code=r.student_code,
-            name=r.name,
-            class_name=r.class_name,
-            section=r.section,
-            status=r.status,
-            expected_fee=r.expected_fee,
-            paid_total=r.paid_total,
-            pending=r.pending,
+    items = []
+    for student in rows:
+        overview = get_student_billing_overview(db, student)
+        paid_total = db.execute(
+            select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.student_id == student.id)
+        ).scalar_one()
+        items.append(
+            StudentListItem(
+                id=student.id,
+                student_code=student.student_code,
+                name=student.name,
+                class_name=student.class_name,
+                section=student.section,
+                status=student.status,
+                expected_fee=overview.monthly_fee,
+                paid_total=paid_total,
+                pending=pending_amount(overview),
+            )
         )
-        for r in rows
-    ]
     return {"items": items, "total": total}
 
 
@@ -369,16 +365,21 @@ def get_student_balance(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> StudentBalanceRead:
-    row = (
-        db.execute(
-            select(StudentBalanceView).where(StudentBalanceView.student_id == student_id)
-        )
-        .scalars()
-        .one_or_none()
-    )
-    if not row:
+    student = db.get(Student, student_id)
+    if not student:
         raise HTTPException(status_code=404, detail="Student not found")
-    return StudentBalanceRead.model_validate(row)
+    overview = get_student_billing_overview(db, student)
+    paid_total = db.execute(
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.student_id == student_id)
+    ).scalar_one()
+    return StudentBalanceRead(
+        student_id=student.id,
+        student_code=student.student_code,
+        name=student.name,
+        expected_fee=overview.monthly_fee,
+        paid_total=paid_total,
+        pending=pending_amount(overview),
+    )
 
 
 @router.patch("/{student_id}", response_model=StudentRead)
@@ -439,3 +440,45 @@ def get_student_fee(
         db.commit()
         db.refresh(fee)
     return StudentFeeRead.model_validate(fee)
+
+
+@router.get("/{student_id}/billing-overview", response_model=StudentBillingOverviewRead)
+def get_student_billing_overview_route(
+    student_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> StudentBillingOverviewRead:
+    student = db.get(Student, student_id)
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    overview = get_student_billing_overview(db, student)
+    return StudentBillingOverviewRead(
+        student_id=student.id,
+        monthly_fee=overview.monthly_fee,
+        cycle_mode=overview.cycle_mode.value,
+        cycle_months=overview.cycle_months,
+        payable_amount=overview.payable_amount,
+        next_unpaid_month=overview.next_unpaid_month,
+        next_unpaid_label=month_label(overview.next_unpaid_month),
+        pending_months=[StudentBillingMonthStatus.model_validate(item) for item in overview.pending_months],
+        months=[StudentBillingMonthStatus.model_validate(item) for item in overview.months],
+    )
+
+
+@router.delete("/{student_id}", status_code=204, response_class=Response)
+def hard_delete_student(
+    student_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_user),
+) -> Response:
+    student = db.get(Student, student_id)
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    if student.status != StudentStatus.inactive:
+        raise HTTPException(status_code=409, detail="Only inactive students can be permanently deleted")
+    has_payments = db.execute(select(func.count()).select_from(Payment).where(Payment.student_id == student_id)).scalar_one()
+    if has_payments:
+        raise HTTPException(status_code=409, detail="Cannot delete inactive student with payment history")
+    db.delete(student)
+    db.commit()
+    return Response(status_code=204)

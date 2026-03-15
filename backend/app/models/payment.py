@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Index, Numeric, String, Uuid
+from sqlalchemy import CheckConstraint, Date, DateTime, Enum, ForeignKey, Index, Numeric, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -24,6 +24,8 @@ class Payment(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     mode: Mapped[PaymentMode] = mapped_column(Enum(PaymentMode, name="payment_mode"), nullable=False)
     reference_no: Mapped[str | None] = mapped_column(String(100), nullable=True)
     notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    billing_start_month: Mapped[date | None] = mapped_column(Date, nullable=True)
+    billing_cycle_months: Mapped[int | None] = mapped_column(nullable=True)
     paid_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
@@ -31,3 +33,4 @@ class Payment(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     created_by: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
 
     student: Mapped["Student"] = relationship(back_populates="payments")
+    billing_periods: Mapped[list["StudentBillingPeriod"]] = relationship(back_populates="payment")

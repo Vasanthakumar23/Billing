@@ -1,5 +1,6 @@
 'use client';
 
+import { Settings } from 'lucide-react';
 import Link from 'next/link';
 import { ReactNode } from 'react';
 
@@ -30,6 +31,9 @@ export function AppShell({ children, title }: { children: ReactNode; title: stri
                 </Link>
               ))}
             </nav>
+            <Button variant="outline" size="sm" onClick={() => window.location.assign('/settings')} aria-label="Billing settings">
+              <Settings className="h-4 w-4" />
+            </Button>
             <Button
               variant="outline"
               size="sm"

@@ -21,4 +21,3 @@ class UserMeResponse(BaseModel):
     id: uuid.UUID
     username: str
     role: UserRole
-

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { AppShell } from '@/components/app/shell';
+import { PaymentReceiptDialog } from '@/components/app/payment-receipt-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,10 +18,12 @@ type Payment = {
   id: string;
   receipt_no: string;
   student_id: string;
+  student_name?: string | null;
   paid_at: string;
   mode: string;
   amount: string;
   notes?: string | null;
+  fee_period_label?: string | null;
 };
 
 export default function TransactionsPage() {
@@ -34,6 +37,8 @@ export default function TransactionsPage() {
 
   const [reverseOpen, setReverseOpen] = useState(false);
   const [reversePayment, setReversePayment] = useState<PaymentRow | null>(null);
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [receiptPaymentId, setReceiptPaymentId] = useState<string | null>(null);
 
   const setReceiptDebounced = useMemo(() => debounce((v: string) => setDebouncedReceipt(v), 250), []);
 
@@ -115,6 +120,8 @@ export default function TransactionsPage() {
                 <tr>
                   <TH>Receipt</TH>
                   <TH>Date</TH>
+                  <TH>Student</TH>
+                  <TH>Fee Period</TH>
                   <TH>Mode</TH>
                   <TH>Amount</TH>
                   <TH>Notes</TH>
@@ -124,7 +131,7 @@ export default function TransactionsPage() {
               <TBody>
                 {q.isLoading ? (
                   <tr>
-                    <TD colSpan={6}>
+                    <TD colSpan={8}>
                       <div className="flex items-center gap-2 text-sm text-slate-600">
                         <Spinner /> Loading
                       </div>
@@ -132,29 +139,43 @@ export default function TransactionsPage() {
                   </tr>
                 ) : q.isError ? (
                   <tr>
-                    <TD colSpan={6} className="text-sm text-red-600">Failed to load</TD>
+                    <TD colSpan={8} className="text-sm text-red-600">Failed to load</TD>
                   </tr>
                 ) : (
                   q.data?.items.map((p) => (
                     <tr key={p.id}>
                       <TD>{p.receipt_no}</TD>
                       <TD>{new Date(p.paid_at).toLocaleString()}</TD>
+                      <TD>{p.student_name ?? '-'}</TD>
+                      <TD>{p.fee_period_label ?? '-'}</TD>
                       <TD>{p.mode}</TD>
                       <TD className={Number(p.amount) < 0 ? 'text-red-600' : ''}>{p.amount}</TD>
                       <TD className="max-w-[520px] truncate" title={p.notes ?? ''}>
                         {p.notes ?? ''}
                       </TD>
                       <TD>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setReversePayment({ id: p.id, receipt_no: p.receipt_no, amount: p.amount, mode: p.mode });
-                            setReverseOpen(true);
-                          }}
-                        >
-                          Reverse
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setReceiptPaymentId(p.id);
+                              setReceiptOpen(true);
+                            }}
+                          >
+                            Receipt
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setReversePayment({ id: p.id, receipt_no: p.receipt_no, amount: p.amount, mode: p.mode });
+                              setReverseOpen(true);
+                            }}
+                          >
+                            Reverse
+                          </Button>
+                        </div>
                       </TD>
                     </tr>
                   ))
@@ -190,6 +211,7 @@ export default function TransactionsPage() {
         payment={reversePayment}
         onSuccess={() => q.refetch()}
       />
+      <PaymentReceiptDialog open={receiptOpen} onOpenChange={setReceiptOpen} paymentId={receiptPaymentId} />
     </AppShell>
   );
 }

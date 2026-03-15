@@ -42,12 +42,12 @@ def test_payment_generates_unique_receipt(client):
 
     p1 = client.post(
         "/api/payments",
-        json={"student_id": student_id, "amount": 100, "mode": "cash"},
+        json={"student_id": student_id, "billing_start_month": "2026-01-01", "mode": "cash"},
         headers=headers,
     )
     p2 = client.post(
         "/api/payments",
-        json={"student_id": student_id, "amount": 50, "mode": "upi"},
+        json={"student_id": student_id, "billing_start_month": "2026-04-01", "mode": "upi"},
         headers=headers,
     )
     assert p1.status_code == 201
@@ -66,7 +66,7 @@ def test_reverse_payment_creates_negative_entry(client):
 
     p = client.post(
         "/api/payments",
-        json={"student_id": student_id, "amount": 250, "mode": "bank"},
+        json={"student_id": student_id, "billing_start_month": "2026-01-01", "mode": "bank"},
         headers=headers,
     )
     payment_id = p.json()["id"]
@@ -97,7 +97,7 @@ def test_pending_calculation_correct(client):
     )
     client.post(
         "/api/payments",
-        json={"student_id": student_id, "amount": 400, "mode": "cash"},
+        json={"student_id": student_id, "billing_start_month": "2026-01-01", "mode": "cash"},
         headers=headers,
     )
 
@@ -137,3 +137,79 @@ def test_import_students_from_excel(client):
     assert data["created"] == 2
     assert data["updated"] == 0
     assert data["fee_updated"] == 2
+
+
+def test_duplicate_month_payment_is_blocked(client):
+    headers = auth_header(client)
+    s = client.post("/api/students", json={"student_code": "S012", "name": "Grace"}, headers=headers)
+    student_id = s.json()["id"]
+    client.patch(f"/api/students/{student_id}/fee", json={"expected_fee_amount": 500}, headers=headers)
+
+    first = client.post(
+        "/api/payments",
+        json={"student_id": student_id, "billing_start_month": "2026-01-01", "mode": "cash"},
+        headers=headers,
+    )
+    second = client.post(
+        "/api/payments",
+        json={"student_id": student_id, "billing_start_month": "2026-02-01", "mode": "upi"},
+        headers=headers,
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 409
+    assert "already paid" in second.json()["detail"].lower()
+
+
+def test_reversal_reopens_billing_periods(client):
+    headers = auth_header(client)
+    s = client.post("/api/students", json={"student_code": "S013", "name": "Hari"}, headers=headers)
+    student_id = s.json()["id"]
+    client.patch(f"/api/students/{student_id}/fee", json={"expected_fee_amount": 600}, headers=headers)
+
+    payment = client.post(
+        "/api/payments",
+        json={"student_id": student_id, "billing_start_month": "2026-01-01", "mode": "cash"},
+        headers=headers,
+    )
+    payment_id = payment.json()["id"]
+    reverse = client.post(f"/api/payments/{payment_id}/reverse", json={"reason": "Customer refund"}, headers=headers)
+    retry = client.post(
+        "/api/payments",
+        json={"student_id": student_id, "billing_start_month": "2026-01-01", "mode": "cash"},
+        headers=headers,
+    )
+
+    assert reverse.status_code == 201
+    assert retry.status_code == 201
+
+
+def test_inactive_student_without_payments_can_be_hard_deleted(client):
+    headers = auth_header(client)
+    s = client.post("/api/students", json={"student_code": "S014", "name": "Ivy"}, headers=headers)
+    student_id = s.json()["id"]
+    client.patch(f"/api/students/{student_id}", json={"status": "inactive"}, headers=headers)
+
+    deleted = client.delete(f"/api/students/{student_id}", headers=headers)
+    lookup = client.get(f"/api/students/{student_id}", headers=headers)
+
+    assert deleted.status_code == 204
+    assert lookup.status_code == 404
+
+
+def test_hard_delete_fails_when_payment_history_exists(client):
+    headers = auth_header(client)
+    s = client.post("/api/students", json={"student_code": "S015", "name": "Jill"}, headers=headers)
+    student_id = s.json()["id"]
+    client.patch(f"/api/students/{student_id}/fee", json={"expected_fee_amount": 700}, headers=headers)
+    client.post(
+        "/api/payments",
+        json={"student_id": student_id, "billing_start_month": "2026-01-01", "mode": "cash"},
+        headers=headers,
+    )
+    client.patch(f"/api/students/{student_id}", json={"status": "inactive"}, headers=headers)
+
+    deleted = client.delete(f"/api/students/{student_id}", headers=headers)
+
+    assert deleted.status_code == 409
+    assert "payment history" in deleted.json()["detail"].lower()

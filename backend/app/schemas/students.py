@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
@@ -76,3 +76,22 @@ class StudentBalanceRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class StudentBillingMonthStatus(BaseModel):
+    month: date
+    label: str
+    is_paid: bool
+    receipt_no: str | None = None
+
+
+class StudentBillingOverviewRead(BaseModel):
+    student_id: uuid.UUID
+    monthly_fee: Decimal
+    cycle_mode: str
+    cycle_months: int
+    payable_amount: Decimal
+    next_unpaid_month: date
+    next_unpaid_label: str
+    pending_months: list[StudentBillingMonthStatus]
+    months: list[StudentBillingMonthStatus]

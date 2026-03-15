@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
@@ -9,6 +9,8 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
 import { AppShell } from '@/components/app/shell';
+import { PaymentReceiptDialog } from '@/components/app/payment-receipt-dialog';
+import { ReversePaymentDialog, type PaymentRow } from '@/components/app/reverse-payment-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,7 +19,6 @@ import { Spinner } from '@/components/ui/spinner';
 import { Table, TBody, TD, TH, THead } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toaster';
 import { apiFetch } from '@/lib/api';
-import { ReversePaymentDialog, type PaymentRow } from '@/components/app/reverse-payment-dialog';
 
 type Student = {
   id: string;
@@ -42,6 +43,22 @@ type Balance = {
   pending: string;
 };
 
+type BillingMonth = {
+  month: string;
+  label: string;
+  is_paid: boolean;
+  receipt_no?: string | null;
+};
+
+type BillingOverview = {
+  monthly_fee: string;
+  cycle_mode: string;
+  cycle_months: number;
+  payable_amount: string;
+  next_unpaid_label: string;
+  pending_months: BillingMonth[];
+};
+
 type Payment = {
   id: string;
   receipt_no: string;
@@ -49,17 +66,22 @@ type Payment = {
   mode: string;
   amount: string;
   notes?: string | null;
+  fee_period_label?: string | null;
 };
 
 export default function StudentDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const id = params.id;
 
   const { toast } = useToast();
   const qc = useQueryClient();
   const [feeOpen, setFeeOpen] = useState(false);
   const [inactiveOpen, setInactiveOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [receiptPaymentId, setReceiptPaymentId] = useState<string | null>(null);
   const pageSize = 25;
 
   const [reverseOpen, setReverseOpen] = useState(false);
@@ -74,6 +96,10 @@ export default function StudentDetailPage() {
   const student = useQuery({ queryKey: ['student', id], queryFn: () => apiFetch<Student>(`/students/${id}`) });
   const fee = useQuery({ queryKey: ['studentFee', id], queryFn: () => apiFetch<Fee>(`/students/${id}/fee`) });
   const balance = useQuery({ queryKey: ['studentBalance', id], queryFn: () => apiFetch<Balance>(`/students/${id}/balance`) });
+  const overview = useQuery({
+    queryKey: ['studentBillingOverview', id],
+    queryFn: () => apiFetch<BillingOverview>(`/students/${id}/billing-overview`)
+  });
   const payments = useQuery({
     queryKey: ['payments', id, page],
     queryFn: () => apiFetch<{ items: Payment[]; total: number }>(`/payments?student_id=${id}&page=${page}&page_size=${pageSize}`)
@@ -85,10 +111,11 @@ export default function StudentDetailPage() {
     mutationFn: (values: { expected_fee_amount: number }) =>
       apiFetch<Fee>(`/students/${id}/fee`, { method: 'PATCH', body: JSON.stringify(values) }),
     onSuccess: () => {
-      toast({ title: 'Fee updated' });
+      toast({ title: 'Monthly fee updated' });
       setFeeOpen(false);
       qc.invalidateQueries({ queryKey: ['studentFee', id] });
       qc.invalidateQueries({ queryKey: ['studentBalance', id] });
+      qc.invalidateQueries({ queryKey: ['studentBillingOverview', id] });
       qc.invalidateQueries({ queryKey: ['students'] });
     },
     onError: (e) => toast({ title: 'Update failed', description: String(e) })
@@ -103,6 +130,17 @@ export default function StudentDetailPage() {
       qc.invalidateQueries({ queryKey: ['students'] });
     },
     onError: (e) => toast({ title: 'Action failed', description: String(e) })
+  });
+
+  const hardDelete = useMutation({
+    mutationFn: async () => {
+      await apiFetch(`/students/${id}`, { method: 'DELETE' });
+    },
+    onSuccess: () => {
+      toast({ title: 'Student permanently deleted' });
+      router.push('/students');
+    },
+    onError: (e) => toast({ title: 'Delete failed', description: String(e) })
   });
 
   return (
@@ -131,28 +169,56 @@ export default function StudentDetailPage() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <Card>
               <CardHeader>
-                <CardTitle>Expected</CardTitle>
+                <CardTitle>Monthly Fee</CardTitle>
               </CardHeader>
-              <CardContent className="text-2xl font-semibold">{balance.data?.expected_fee ?? fee.data?.expected_fee_amount ?? '0'}</CardContent>
+              <CardContent className="text-2xl font-semibold">{fee.data?.expected_fee_amount ?? '0'}</CardContent>
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle>Paid</CardTitle>
+                <CardTitle>Cycle Amount</CardTitle>
+              </CardHeader>
+              <CardContent className="text-2xl font-semibold">{overview.data?.payable_amount ?? '0'}</CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Paid Total</CardTitle>
               </CardHeader>
               <CardContent className="text-2xl font-semibold">{balance.data?.paid_total ?? '0'}</CardContent>
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle>Pending</CardTitle>
+                <CardTitle>Next Unpaid</CardTitle>
               </CardHeader>
-              <CardContent className="text-2xl font-semibold">{balance.data?.pending ?? '0'}</CardContent>
+              <CardContent className="text-lg font-semibold">{overview.data?.next_unpaid_label ?? '-'}</CardContent>
             </Card>
           </div>
 
-          <div className="flex gap-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Billing Status</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="text-sm text-slate-600">
+                Current cycle: {overview.data?.cycle_mode?.replaceAll('_', ' ')} ({overview.data?.cycle_months ?? 0} months)
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {overview.data?.pending_months.length ? (
+                  overview.data.pending_months.map((month) => (
+                    <Badge key={month.month} className="bg-amber-50 text-amber-800 hover:bg-amber-50">
+                      {month.label}
+                    </Badge>
+                  ))
+                ) : (
+                  <div className="text-sm text-slate-600">No pending months in the current billing window.</div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex flex-wrap gap-2">
             <Link href={`/collect?student_id=${id}`}>
               <Button>Collect Payment</Button>
             </Link>
@@ -163,14 +229,17 @@ export default function StudentDetailPage() {
                 setFeeOpen(true);
               }}
             >
-              Edit Expected Fee
+              Edit Monthly Fee
             </Button>
             {student.data?.status === 'active' ? (
               <Button variant="destructive" onClick={() => setInactiveOpen(true)}>
                 Mark Inactive
               </Button>
-            ) : null}
-
+            ) : (
+              <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
+                Permanently Delete
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={() => window.location.assign(`/api/backend/export/payments.csv?student_id=${id}`)}
@@ -189,6 +258,7 @@ export default function StudentDetailPage() {
                   <THead>
                     <tr>
                       <TH>Receipt</TH>
+                      <TH>Fee Period</TH>
                       <TH>Date</TH>
                       <TH>Mode</TH>
                       <TH>Amount</TH>
@@ -199,7 +269,7 @@ export default function StudentDetailPage() {
                   <TBody>
                     {payments.isLoading ? (
                       <tr>
-                        <TD colSpan={6}>
+                        <TD colSpan={7}>
                           <div className="flex items-center gap-2 text-sm text-slate-600">
                             <Spinner /> Loading
                           </div>
@@ -207,7 +277,7 @@ export default function StudentDetailPage() {
                       </tr>
                     ) : payments.isError ? (
                       <tr>
-                        <TD colSpan={6} className="text-sm text-red-600">
+                        <TD colSpan={7} className="text-sm text-red-600">
                           Failed to load payments
                         </TD>
                       </tr>
@@ -215,29 +285,42 @@ export default function StudentDetailPage() {
                       payments.data.items.map((p) => (
                         <tr key={p.id}>
                           <TD>{p.receipt_no}</TD>
+                          <TD>{p.fee_period_label ?? '-'}</TD>
                           <TD>{new Date(p.paid_at).toLocaleString()}</TD>
                           <TD>{p.mode}</TD>
                           <TD className={Number(p.amount) < 0 ? 'text-red-600' : ''}>{p.amount}</TD>
-                          <TD className="max-w-[420px] truncate" title={p.notes ?? ''}>
+                          <TD className="max-w-[320px] truncate" title={p.notes ?? ''}>
                             {p.notes ?? ''}
                           </TD>
                           <TD>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setReversePayment({ id: p.id, receipt_no: p.receipt_no, amount: p.amount, mode: p.mode });
-                                setReverseOpen(true);
-                              }}
-                            >
-                              Reverse
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setReceiptPaymentId(p.id);
+                                  setReceiptOpen(true);
+                                }}
+                              >
+                                Receipt
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setReversePayment({ id: p.id, receipt_no: p.receipt_no, amount: p.amount, mode: p.mode });
+                                  setReverseOpen(true);
+                                }}
+                              >
+                                Reverse
+                              </Button>
+                            </div>
                           </TD>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <TD colSpan={6} className="text-sm text-slate-600">
+                        <TD colSpan={7} className="text-sm text-slate-600">
                           No payments
                         </TD>
                       </tr>
@@ -270,12 +353,12 @@ export default function StudentDetailPage() {
           <Dialog open={feeOpen} onOpenChange={setFeeOpen}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Edit Expected Fee</DialogTitle>
+                <DialogTitle>Edit Monthly Fee</DialogTitle>
               </DialogHeader>
               <form onSubmit={feeForm.handleSubmit((v) => updateFee.mutate(v))}>
                 <DialogBody>
                   <div>
-                    <div className="mb-1 text-sm text-slate-600">Expected Fee</div>
+                    <div className="mb-1 text-sm text-slate-600">Monthly Fee</div>
                     <input
                       type="number"
                       step="0.01"
@@ -306,7 +389,9 @@ export default function StudentDetailPage() {
                 <DialogTitle>Mark Student Inactive</DialogTitle>
               </DialogHeader>
               <DialogBody>
-                <div className="text-sm text-slate-600">This is a soft delete. Payments remain unchanged.</div>
+                <div className="text-sm text-slate-600">
+                  This keeps all billing history but removes the student from the active list. Only inactive students become eligible for permanent deletion.
+                </div>
               </DialogBody>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setInactiveOpen(false)}>
@@ -320,6 +405,30 @@ export default function StudentDetailPage() {
             </DialogContent>
           </Dialog>
 
+          <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Permanently Delete Student</DialogTitle>
+              </DialogHeader>
+              <DialogBody>
+                <div className="text-sm text-slate-600">
+                  This permanently removes the inactive student record. The action is blocked if any payment history exists.
+                </div>
+              </DialogBody>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="button" variant="destructive" onClick={() => hardDelete.mutate()} disabled={hardDelete.isPending}>
+                  {hardDelete.isPending ? <Spinner className="mr-2" /> : null}
+                  Delete Permanently
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <PaymentReceiptDialog open={receiptOpen} onOpenChange={setReceiptOpen} paymentId={receiptPaymentId} />
+
           <ReversePaymentDialog
             open={reverseOpen}
             onOpenChange={setReverseOpen}
@@ -327,6 +436,7 @@ export default function StudentDetailPage() {
             onSuccess={() => {
               payments.refetch();
               balance.refetch();
+              overview.refetch();
             }}
           />
         </div>

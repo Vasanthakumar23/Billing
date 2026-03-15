@@ -12,8 +12,13 @@ class StudentStatus(str, enum.Enum):
     inactive = "inactive"
 
 
+class PaymentCycle(str, enum.Enum):
+    monthly = "monthly"
+    bi_monthly = "bi_monthly"
+    tri_monthly = "tri_monthly"
+
+
 class PaymentMode(str, enum.Enum):
     cash = "cash"
     upi = "upi"
     bank = "bank"
-

@@ -31,4 +31,6 @@ class Student(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         back_populates="student", cascade="all, delete-orphan", uselist=False
     )
     payments: Mapped[list["Payment"]] = relationship(back_populates="student")
-
+    billing_periods: Mapped[list["StudentBillingPeriod"]] = relationship(
+        back_populates="student", cascade="all, delete-orphan"
+    )
