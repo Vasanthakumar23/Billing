@@ -42,12 +42,12 @@ def test_payment_generates_unique_receipt(client):
 
     p1 = client.post(
         "/api/payments",
-        json={"student_id": student_id, "billing_start_month": "2026-01-01", "mode": "cash"},
+        json={"student_id": student_id, "student_code": "S002", "billing_start_month": "2026-01-01", "mode": "cash"},
         headers=headers,
     )
     p2 = client.post(
         "/api/payments",
-        json={"student_id": student_id, "billing_start_month": "2026-04-01", "mode": "upi"},
+        json={"student_id": student_id, "student_code": "S002", "billing_start_month": "2026-04-01", "mode": "upi"},
         headers=headers,
     )
     assert p1.status_code == 201
@@ -66,7 +66,7 @@ def test_reverse_payment_creates_negative_entry(client):
 
     p = client.post(
         "/api/payments",
-        json={"student_id": student_id, "billing_start_month": "2026-01-01", "mode": "bank"},
+        json={"student_id": student_id, "student_code": "S003", "billing_start_month": "2026-01-01", "mode": "bank"},
         headers=headers,
     )
     payment_id = p.json()["id"]
@@ -97,7 +97,7 @@ def test_pending_calculation_correct(client):
     )
     client.post(
         "/api/payments",
-        json={"student_id": student_id, "billing_start_month": "2026-01-01", "mode": "cash"},
+        json={"student_id": student_id, "student_code": "S004", "billing_start_month": "2026-01-01", "mode": "cash"},
         headers=headers,
     )
 
@@ -147,12 +147,12 @@ def test_duplicate_month_payment_is_blocked(client):
 
     first = client.post(
         "/api/payments",
-        json={"student_id": student_id, "billing_start_month": "2026-01-01", "mode": "cash"},
+        json={"student_id": student_id, "student_code": "S012", "billing_start_month": "2026-01-01", "mode": "cash"},
         headers=headers,
     )
     second = client.post(
         "/api/payments",
-        json={"student_id": student_id, "billing_start_month": "2026-02-01", "mode": "upi"},
+        json={"student_id": student_id, "student_code": "S012", "billing_start_month": "2026-02-01", "mode": "upi"},
         headers=headers,
     )
 
@@ -169,14 +169,14 @@ def test_reversal_reopens_billing_periods(client):
 
     payment = client.post(
         "/api/payments",
-        json={"student_id": student_id, "billing_start_month": "2026-01-01", "mode": "cash"},
+        json={"student_id": student_id, "student_code": "S013", "billing_start_month": "2026-01-01", "mode": "cash"},
         headers=headers,
     )
     payment_id = payment.json()["id"]
     reverse = client.post(f"/api/payments/{payment_id}/reverse", json={"reason": "Customer refund"}, headers=headers)
     retry = client.post(
         "/api/payments",
-        json={"student_id": student_id, "billing_start_month": "2026-01-01", "mode": "cash"},
+        json={"student_id": student_id, "student_code": "S013", "billing_start_month": "2026-01-01", "mode": "cash"},
         headers=headers,
     )
 
@@ -204,7 +204,7 @@ def test_hard_delete_fails_when_payment_history_exists(client):
     client.patch(f"/api/students/{student_id}/fee", json={"expected_fee_amount": 700}, headers=headers)
     client.post(
         "/api/payments",
-        json={"student_id": student_id, "billing_start_month": "2026-01-01", "mode": "cash"},
+        json={"student_id": student_id, "student_code": "S015", "billing_start_month": "2026-01-01", "mode": "cash"},
         headers=headers,
     )
     client.patch(f"/api/students/{student_id}", json={"status": "inactive"}, headers=headers)

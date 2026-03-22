@@ -18,6 +18,7 @@ from app.models.user import User
 from app.schemas.payments import PaymentCreate, PaymentRead, PaymentReverseRequest
 from app.services.billing import (
     assign_periods_to_payment,
+    cycle_mode_for_months,
     cycle_months_for,
     fee_period_label,
     get_billing_settings,
@@ -55,12 +56,15 @@ def create_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> PaymentRead:
-    student = db.get(Student, payload.student_id)
+    student = db.execute(select(Student).where(Student.student_code == payload.student_code)).scalar_one_or_none()
     if not student:
-        raise HTTPException(status_code=404, detail="Student not found")
+        raise HTTPException(status_code=404, detail="Student not found for the provided roll number")
+    if payload.student_id and student.id != payload.student_id:
+        raise HTTPException(status_code=409, detail="Student ID and roll number do not match")
 
     settings = get_billing_settings(db)
-    cycle_months = cycle_months_for(settings.cycle_mode)
+    selected_cycle_mode = payload.cycle_mode or settings.cycle_mode
+    cycle_months = cycle_months_for(selected_cycle_mode)
     monthly_fee = get_student_monthly_fee(db, student.id)
     amount = monthly_fee * Decimal(cycle_months)
     if amount == 0:
@@ -69,7 +73,7 @@ def create_payment(
     receipt_no = _generate_receipt_no(db)
     payment = Payment(
         receipt_no=receipt_no,
-        student_id=payload.student_id,
+        student_id=student.id,
         amount=amount,
         mode=payload.mode,
         reference_no=payload.reference_no,
@@ -209,6 +213,7 @@ def _payment_read(payment: Payment) -> PaymentRead:
     data = PaymentRead.model_validate(payment).model_dump()
     data["student_name"] = payment.student.name if payment.student else None
     data["student_code"] = payment.student.student_code if payment.student else None
+    data["cycle_mode"] = cycle_mode_for_months(payment.billing_cycle_months)
     data["fee_period_label"] = fee_period_label(payment.billing_start_month, payment.billing_cycle_months)
     return PaymentRead.model_validate(data)
 

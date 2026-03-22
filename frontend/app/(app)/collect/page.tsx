@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { Settings } from 'lucide-react';
 
 import { AppShell } from '@/components/app/shell';
 import { Receipt, type ReceiptData } from '@/components/app/receipt';
@@ -43,9 +44,23 @@ type BillingOverview = {
   months: BillingMonth[];
 };
 
+const cycleLabels = {
+  monthly: 'Monthly',
+  bi_monthly: 'Bi-Monthly',
+  tri_monthly: 'Tri-Monthly'
+} as const;
+
+const cycleMonths = {
+  monthly: 1,
+  bi_monthly: 2,
+  tri_monthly: 3
+} as const;
+
 const schema = z.object({
-  student_id: z.string().uuid(),
+  student_id: z.string().uuid().optional().or(z.literal('')),
+  student_code: z.string().min(1, 'Roll number is required'),
   billing_start_month: z.string().min(1),
+  cycle_mode: z.enum(['monthly', 'bi_monthly', 'tri_monthly']).optional(),
   mode: z.enum(['cash', 'upi', 'bank']),
   reference_no: z.string().optional(),
   notes: z.string().optional()
@@ -57,37 +72,79 @@ export default function CollectPage() {
   const router = useRouter();
   const { toast } = useToast();
   const studentId = params.get('student_id') ?? '';
+  const rollNoFromQuery = params.get('student_code') ?? '';
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+  const [studentCodeLookup, setStudentCodeLookup] = useState(rollNoFromQuery);
+  const [overrideOpen, setOverrideOpen] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { student_id: studentId, billing_start_month: '', mode: 'cash', reference_no: '', notes: '' }
+    defaultValues: {
+      student_id: studentId,
+      student_code: rollNoFromQuery,
+      billing_start_month: '',
+      cycle_mode: undefined,
+      mode: 'cash',
+      reference_no: '',
+      notes: ''
+    }
   });
 
   useEffect(() => {
     form.setValue('student_id', studentId);
-  }, [form, studentId]);
+    if (rollNoFromQuery) {
+      form.setValue('student_code', rollNoFromQuery);
+      setStudentCodeLookup(rollNoFromQuery);
+    }
+  }, [form, rollNoFromQuery, studentId]);
 
   const student = useQuery({
-    queryKey: ['student', studentId],
-    enabled: Boolean(studentId),
-    queryFn: () => apiFetch<Student>(`/students/${studentId}`)
+    queryKey: ['studentByCode', studentCodeLookup],
+    enabled: Boolean(studentCodeLookup),
+    queryFn: async () => {
+      const data = await apiFetch<{ items: Student[]; total: number }>(
+        `/students?search=${encodeURIComponent(studentCodeLookup)}&page=1&page_size=10`
+      );
+      const exact = data.items.find((item) => item.student_code.toLowerCase() === studentCodeLookup.toLowerCase());
+      if (!exact) throw new Error('Student not found for this roll number');
+      form.setValue('student_id', exact.id);
+      form.setValue('student_code', exact.student_code);
+      return exact;
+    }
   });
+  const studentById = useQuery({
+    queryKey: ['studentById', studentId],
+    enabled: Boolean(studentId) && !Boolean(studentCodeLookup),
+    queryFn: async () => {
+      const data = await apiFetch<Student>(`/students/${studentId}`);
+      form.setValue('student_id', data.id);
+      form.setValue('student_code', data.student_code);
+      setStudentCodeLookup(data.student_code);
+      return data;
+    }
+  });
+  const selectedStudent = student.data ?? studentById.data;
+  const isStudentLoading = student.isLoading || studentById.isLoading;
+  const isStudentError = student.isError || studentById.isError;
 
   const overview = useQuery({
-    queryKey: ['studentBillingOverview', studentId],
-    enabled: Boolean(studentId),
-    queryFn: () => apiFetch<BillingOverview>(`/students/${studentId}/billing-overview`)
+    queryKey: ['studentBillingOverview', selectedStudent?.id],
+    enabled: Boolean(selectedStudent?.id),
+    queryFn: () => apiFetch<BillingOverview>(`/students/${selectedStudent?.id}/billing-overview`)
   });
+
+  const selectedCycleMode = form.watch('cycle_mode') || overview.data?.cycle_mode || 'tri_monthly';
+  const selectedCycleMonths = cycleMonths[selectedCycleMode];
+  const payableAmount = overview.data ? (Number(overview.data.monthly_fee) * selectedCycleMonths).toFixed(2) : '0.00';
 
   const validOptions = useMemo(() => {
     if (!overview.data) return [];
     return overview.data.months.filter((month, index, months) => {
       if (month.is_paid) return false;
-      const span = months.slice(index, index + overview.data.cycle_months);
-      return span.length === overview.data.cycle_months && span.every((item) => !item.is_paid);
+      const span = months.slice(index, index + selectedCycleMonths);
+      return span.length === selectedCycleMonths && span.every((item) => !item.is_paid);
     });
-  }, [overview.data]);
+  }, [overview.data, selectedCycleMonths]);
 
   useEffect(() => {
     if (!overview.data || validOptions.length === 0) return;
@@ -123,31 +180,31 @@ export default function CollectPage() {
               <CardTitle>Student Billing</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {studentId ? (
-                student.isLoading || overview.isLoading ? (
+              {studentCodeLookup ? (
+                isStudentLoading || overview.isLoading ? (
                   <div className="flex items-center gap-2 text-sm text-slate-600">
                     <Spinner /> Loading
                   </div>
-                ) : student.isError || overview.isError ? (
+                ) : isStudentError || overview.isError ? (
                   <div className="text-sm text-red-600">Failed to load student billing data</div>
                 ) : (
                   <>
                     <div className="flex items-center justify-between gap-3 rounded-md border border-slate-200 p-3">
                       <div>
                         <div className="font-semibold text-slate-900">
-                          {student.data?.name} ({student.data?.student_code})
+                          {selectedStudent?.name} ({selectedStudent?.student_code})
                         </div>
-                        <div className="text-sm text-slate-600">Monthly fee stored per student</div>
+                        <div className="text-sm text-slate-600">Roll number confirms which student this payment belongs to</div>
                       </div>
-                      <Badge className={student.data?.status === 'active' ? '' : 'bg-slate-100 text-slate-500'}>
-                        {student.data?.status}
+                      <Badge className={selectedStudent?.status === 'active' ? '' : 'bg-slate-100 text-slate-500'}>
+                        {selectedStudent?.status}
                       </Badge>
                     </div>
 
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                       <div className="rounded-md border border-slate-200 p-3">
                         <div className="text-xs text-slate-500">Cycle</div>
-                        <div className="font-semibold text-slate-900">{overview.data?.cycle_mode.replaceAll('_', ' ')}</div>
+                        <div className="font-semibold text-slate-900">{cycleLabels[selectedCycleMode]}</div>
                       </div>
                       <div className="rounded-md border border-slate-200 p-3">
                         <div className="text-xs text-slate-500">Monthly Fee</div>
@@ -155,7 +212,7 @@ export default function CollectPage() {
                       </div>
                       <div className="rounded-md border border-slate-200 p-3">
                         <div className="text-xs text-slate-500">Payable Now</div>
-                        <div className="font-semibold text-slate-900">{overview.data?.payable_amount}</div>
+                        <div className="font-semibold text-slate-900">{payableAmount}</div>
                       </div>
                     </div>
 
@@ -210,6 +267,49 @@ export default function CollectPage() {
             <CardContent>
               <form className="space-y-3" onSubmit={form.handleSubmit((v) => createPayment.mutate(v))}>
                 <div>
+                  <div className="mb-1 text-sm text-slate-600">Student roll no</div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={form.watch('student_code')}
+                      onChange={(e) => form.setValue('student_code', e.target.value)}
+                      placeholder="S001"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setStudentCodeLookup(form.getValues('student_code').trim())}
+                    >
+                      Load
+                    </Button>
+                  </div>
+                  {isStudentError ? <div className="mt-1 text-xs text-red-600">Invalid roll number</div> : null}
+                </div>
+                <div>
+                  <div className="mb-1 flex items-center justify-between text-sm text-slate-600">
+                    <span>Payment cycle</span>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setOverrideOpen((v) => !v)}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      {overrideOpen ? 'Hide' : 'Override'}
+                    </Button>
+                  </div>
+                  <div className="rounded-md border border-slate-200 p-3 text-sm">
+                    Default: {overview.data ? cycleLabels[overview.data.cycle_mode] : 'Tri-Monthly'}
+                  </div>
+                  {overrideOpen ? (
+                    <select
+                      className="mt-2 h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                      value={form.watch('cycle_mode') ?? overview.data?.cycle_mode ?? 'tri_monthly'}
+                      onChange={(e) =>
+                        form.setValue('cycle_mode', e.target.value as FormValues['cycle_mode'])
+                      }
+                    >
+                      <option value="monthly">Monthly</option>
+                      <option value="bi_monthly">Bi-Monthly</option>
+                      <option value="tri_monthly">Tri-Monthly</option>
+                    </select>
+                  ) : null}
+                </div>
+                <div>
                   <div className="mb-1 text-sm text-slate-600">Start month</div>
                   <select
                     className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
@@ -226,7 +326,7 @@ export default function CollectPage() {
                     )}
                   </select>
                   <div className="mt-1 text-xs text-slate-500">
-                    Already-paid months are excluded. A start month is only available if the full cycle window is unpaid.
+                    Already-paid months are excluded. A start month is only available if the full selected cycle window is unpaid.
                   </div>
                 </div>
                 <div>
@@ -248,9 +348,9 @@ export default function CollectPage() {
                   <div className="mb-1 text-sm text-slate-600">Notes</div>
                   <Input {...form.register('notes')} />
                 </div>
-                <Button type="submit" disabled={createPayment.isPending || !studentId || validOptions.length === 0}>
+                <Button type="submit" disabled={createPayment.isPending || !selectedStudent?.id || validOptions.length === 0}>
                   {createPayment.isPending ? <Spinner className="mr-2" /> : null}
-                  Charge {overview.data?.payable_amount ?? ''}
+                  Charge {payableAmount}
                 </Button>
               </form>
             </CardContent>

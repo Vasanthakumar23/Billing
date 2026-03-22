@@ -1,10 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { AppShell } from '@/components/app/shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/components/ui/toaster';
 import { apiFetch } from '@/lib/api';
@@ -24,6 +26,9 @@ const choices: Array<{ value: BillingSettings['cycle_mode']; label: string; desc
 export default function SettingsPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importMode, setImportMode] = useState<'upsert' | 'create_only'>('upsert');
   const settings = useQuery({
     queryKey: ['billingSettings'],
     queryFn: () => apiFetch<BillingSettings>('/settings/billing')
@@ -37,6 +42,32 @@ export default function SettingsPage() {
       qc.invalidateQueries({ queryKey: ['billingSettings'] });
     },
     onError: (e) => toast({ title: 'Update failed', description: String(e) })
+  });
+
+  const importStudents = useMutation({
+    mutationFn: async () => {
+      if (!importFile) throw new Error('Please choose an .xlsx file');
+      const fd = new FormData();
+      fd.append('file', importFile);
+
+      const res = await fetch(`/api/backend/students/import?mode=${encodeURIComponent(importMode)}`, {
+        method: 'POST',
+        body: fd
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.detail ? JSON.stringify(data.detail) : 'Import failed');
+      return data as { created: number; updated: number; fee_updated: number };
+    },
+    onSuccess: (data) => {
+      toast({
+        title: 'Import completed',
+        description: `Created: ${data.created}, Updated: ${data.updated}, Fee updated: ${data.fee_updated}`
+      });
+      setImportOpen(false);
+      setImportFile(null);
+      qc.invalidateQueries({ queryKey: ['students'] });
+    },
+    onError: (e) => toast({ title: 'Import failed', description: String(e) })
   });
 
   return (
@@ -97,6 +128,79 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Card className="mt-4">
+        <CardHeader>
+          <CardTitle>Student Import</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-sm text-slate-600">
+            Upload student Excel sheets from the admin settings area only.
+          </div>
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            Upload Student Excel
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Dialog
+        open={importOpen}
+        onOpenChange={(v) => {
+          setImportOpen(v);
+          if (!v) {
+            setImportFile(null);
+            setImportMode('upsert');
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import Students (Excel)</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <div className="space-y-3">
+              <div className="text-sm text-slate-600">
+                Upload an <span className="font-medium text-slate-900">.xlsx</span> with columns like{' '}
+                <span className="font-medium text-slate-900">rollno/student_code</span>,{' '}
+                <span className="font-medium text-slate-900">name</span>,{' '}
+                <span className="font-medium text-slate-900">std/class</span>,{' '}
+                <span className="font-medium text-slate-900">section</span>, and{' '}
+                <span className="font-medium text-slate-900">fees</span>.
+              </div>
+
+              <div>
+                <div className="mb-1 text-sm text-slate-600">Mode</div>
+                <select
+                  className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                  value={importMode}
+                  onChange={(e) => setImportMode(e.target.value as 'upsert' | 'create_only')}
+                >
+                  <option value="upsert">Upsert (create or update)</option>
+                  <option value="create_only">Create only (error if exists)</option>
+                </select>
+              </div>
+
+              <div>
+                <div className="mb-1 text-sm text-slate-600">Excel file</div>
+                <input
+                  type="file"
+                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                />
+              </div>
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setImportOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => importStudents.mutate()} disabled={importStudents.isPending || !importFile}>
+              {importStudents.isPending ? <Spinner className="mr-2" /> : null}
+              Import
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }

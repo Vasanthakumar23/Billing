@@ -38,6 +38,16 @@ def cycle_months_for(mode: PaymentCycle) -> int:
     return mapping[mode]
 
 
+def cycle_mode_for_months(months: int | None) -> PaymentCycle | None:
+    if months == 1:
+        return PaymentCycle.monthly
+    if months == 2:
+        return PaymentCycle.bi_monthly
+    if months == 3:
+        return PaymentCycle.tri_monthly
+    return None
+
+
 def get_billing_settings(db: Session) -> BillingSettings:
     settings = db.get(BillingSettings, 1)
     if not settings:
