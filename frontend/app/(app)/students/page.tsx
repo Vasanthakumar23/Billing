@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { Download, Plus, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -40,6 +40,7 @@ const createSchema = z.object({
   class_name: z.string().max(100).optional(),
   section: z.string().max(50).optional()
 });
+
 type CreateValues = z.infer<typeof createSchema>;
 
 export default function StudentsPage() {
@@ -68,7 +69,7 @@ export default function StudentsPage() {
   });
 
   const createStudent = useMutation({
-    mutationFn: (values: CreateValues) => apiFetch<StudentListItem>(`/students`, { method: 'POST', body: JSON.stringify(values) }),
+    mutationFn: (values: CreateValues) => apiFetch<StudentListItem>('/students', { method: 'POST', body: JSON.stringify(values) }),
     onSuccess: () => {
       toast({ title: 'Student created' });
       setCreateOpen(false);
@@ -81,19 +82,40 @@ export default function StudentsPage() {
   const totalPages = query.data ? Math.max(1, Math.ceil(query.data.total / 25)) : 1;
 
   return (
-    <AppShell title="Students">
-      <Card>
-        <CardContent>
-          <div className="flex items-center justify-between gap-3">
-            <div className="w-full max-w-md">
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by ID or name" />
-            </div>
-            <div className="flex items-center gap-2">
+    <AppShell
+      title="Student Management"
+      subtitle="View, add, and manage student records, balances, and payment health from one place."
+      action={
+        <div className="flex flex-wrap gap-3">
+          <Button variant="outline" onClick={() => window.location.assign('/api/backend/export/students.csv')}>
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Add Student
+          </Button>
+        </div>
+      }
+    >
+      <div className="page-grid">
+        <Card>
+          <CardContent className="space-y-5">
+            <div className="grid gap-4 lg:grid-cols-[1fr_160px]">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7484a1]" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by roll number or student name"
+                  className="pl-11"
+                />
+              </div>
               <select
-                className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm"
+                className="h-12 rounded-2xl border border-[rgba(151,164,187,0.14)] bg-[rgba(255,255,255,0.04)] px-4 text-sm text-white outline-none"
                 value={status}
                 onChange={(e) => {
-                  setStatus(e.target.value as any);
+                  setStatus(e.target.value as 'all' | 'active' | 'inactive');
                   setPage(1);
                 }}
               >
@@ -101,91 +123,93 @@ export default function StudentsPage() {
                 <option value="inactive">Inactive</option>
                 <option value="all">All</option>
               </select>
-              <Button variant="outline" onClick={() => setCreateOpen(true)}>
-                Add Student
-              </Button>
-              <Button variant="outline" onClick={() => window.location.assign('/api/backend/export/students.csv')}>
-                Export CSV
-              </Button>
             </div>
-          </div>
+            <div className="text-sm text-[#91a1bc]">
+              Showing <span className="font-semibold text-white">{query.data?.total ?? 0}</span> student records
+            </div>
+          </CardContent>
+        </Card>
 
-          <div className="mt-4 overflow-auto rounded-md border border-slate-200">
-            <Table>
-              <THead>
-                <tr>
-                  <TH>Student ID</TH>
-                  <TH>Name</TH>
-                  <TH>Class</TH>
-                  <TH>Expected</TH>
-                  <TH>Paid</TH>
-                  <TH>Pending</TH>
-                  <TH>Status</TH>
-                  <TH>Actions</TH>
-                </tr>
-              </THead>
-              <TBody>
-                {query.isLoading ? (
+        <Card>
+          <CardContent>
+            <div className="overflow-auto rounded-[24px] border border-[rgba(151,164,187,0.08)] bg-[rgba(255,255,255,0.02)]">
+              <Table>
+                <THead>
                   <tr>
-                    <TD colSpan={8}>
-                      <div className="flex items-center gap-2 text-sm text-slate-600">
-                        <Spinner /> Loading
-                      </div>
-                    </TD>
+                    <TH>Student</TH>
+                    <TH>Class</TH>
+                    <TH>Monthly Fee</TH>
+                    <TH>Paid</TH>
+                    <TH>Pending</TH>
+                    <TH>Status</TH>
+                    <TH></TH>
                   </tr>
-                ) : query.isError ? (
-                  <tr>
-                    <TD colSpan={8} className="text-sm text-red-600">
-                      Failed to load students
-                    </TD>
-                  </tr>
-                ) : query.data?.items.length ? (
-                  query.data.items.map((s) => (
-                    <tr key={s.id}>
-                      <TD>{s.student_code}</TD>
-                      <TD>{s.name}</TD>
-                      <TD>
-                        {s.class_name ?? '-'} {s.section ?? ''}
-                      </TD>
-                      <TD>{s.expected_fee}</TD>
-                      <TD>{s.paid_total}</TD>
-                      <TD className={Number(s.pending) > 0 ? 'font-semibold' : ''}>{s.pending}</TD>
-                      <TD>
-                        <Badge className={s.status === 'active' ? '' : 'bg-slate-100 text-slate-500'}>{s.status}</Badge>
-                      </TD>
-                      <TD>
-                        <Link href={`/students/${s.id}`} className="text-sm text-slate-900 underline">
-                          View
-                        </Link>
+                </THead>
+                <TBody>
+                  {query.isLoading ? (
+                    <tr>
+                      <TD colSpan={7}>
+                        <div className="flex items-center gap-2 text-sm text-[#91a1bc]">
+                          <Spinner /> Loading
+                        </div>
                       </TD>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <TD colSpan={8} className="text-sm text-slate-600">
-                      No students
-                    </TD>
-                  </tr>
-                )}
-              </TBody>
-            </Table>
-          </div>
+                  ) : query.isError ? (
+                    <tr>
+                      <TD colSpan={7} className="text-sm text-rose-300">
+                        Failed to load students
+                      </TD>
+                    </tr>
+                  ) : query.data?.items.length ? (
+                    query.data.items.map((s) => (
+                      <tr key={s.id}>
+                        <TD>
+                          <div className="font-semibold text-white">{s.name}</div>
+                          <div className="mt-1 text-sm text-[#91a1bc]">{s.student_code}</div>
+                        </TD>
+                        <TD>{s.class_name ?? '-'} {s.section ?? ''}</TD>
+                        <TD>{s.expected_fee}</TD>
+                        <TD>{s.paid_total}</TD>
+                        <TD className={Number(s.pending) > 0 ? 'font-semibold text-white' : ''}>{s.pending}</TD>
+                        <TD>
+                          <Badge className={s.status === 'active' ? 'bg-[rgba(46,216,143,0.16)] text-[#48e69b]' : 'bg-[rgba(151,164,187,0.08)] text-[#9aa8c2]'}>
+                            {s.status}
+                          </Badge>
+                        </TD>
+                        <TD>
+                          <Link href={`/students/${s.id}`} className="font-semibold text-[#a7c1ff] transition-colors hover:text-white">
+                            View profile
+                          </Link>
+                        </TD>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <TD colSpan={7} className="text-sm text-[#91a1bc]">
+                        No students found
+                      </TD>
+                    </tr>
+                  )}
+                </TBody>
+              </Table>
+            </div>
 
-          <div className="mt-3 flex items-center justify-between">
-            <div className="text-sm text-slate-600">
-              Page {page} / {totalPages}
+            <div className="mt-5 flex items-center justify-between">
+              <div className="text-sm text-[#91a1bc]">
+                Page {page} of {totalPages}
+              </div>
+              <div className="flex gap-3">
+                <Button variant="outline" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                  Prev
+                </Button>
+                <Button variant="outline" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+                  Next
+                </Button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                Prev
-              </Button>
-              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
-                Next
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
@@ -194,28 +218,22 @@ export default function StudentsPage() {
           </DialogHeader>
           <form onSubmit={form.handleSubmit((v) => createStudent.mutate(v))}>
             <DialogBody>
-              <div className="grid grid-cols-1 gap-3">
+              <div className="grid gap-4">
                 <div>
-                  <div className="mb-1 text-sm text-slate-600">Student ID</div>
+                  <div className="mb-2 text-sm font-medium text-[#dbe6ff]">Roll Number</div>
                   <Input {...form.register('student_code')} />
-                  {form.formState.errors.student_code ? (
-                    <div className="mt-1 text-xs text-red-600">{form.formState.errors.student_code.message}</div>
-                  ) : null}
                 </div>
                 <div>
-                  <div className="mb-1 text-sm text-slate-600">Name</div>
+                  <div className="mb-2 text-sm font-medium text-[#dbe6ff]">Student Name</div>
                   <Input {...form.register('name')} />
-                  {form.formState.errors.name ? (
-                    <div className="mt-1 text-xs text-red-600">{form.formState.errors.name.message}</div>
-                  ) : null}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <div className="mb-1 text-sm text-slate-600">Class</div>
+                    <div className="mb-2 text-sm font-medium text-[#dbe6ff]">Class</div>
                     <Input {...form.register('class_name')} />
                   </div>
                   <div>
-                    <div className="mb-1 text-sm text-slate-600">Section</div>
+                    <div className="mb-2 text-sm font-medium text-[#dbe6ff]">Section</div>
                     <Input {...form.register('section')} />
                   </div>
                 </div>
@@ -227,13 +245,12 @@ export default function StudentsPage() {
               </Button>
               <Button type="submit" disabled={createStudent.isPending}>
                 {createStudent.isPending ? <Spinner className="mr-2" /> : null}
-                Create
+                Create Student
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
-
     </AppShell>
   );
 }

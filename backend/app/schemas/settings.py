@@ -17,3 +17,16 @@ class BillingSettingsRead(BaseModel):
 
 class BillingSettingsUpdate(BaseModel):
     cycle_mode: PaymentCycle
+
+
+class DatabaseResetRequest(BaseModel):
+    confirmation_text: str
+
+
+class DatabaseResetRead(BaseModel):
+    students_deleted: int
+    payments_deleted: int
+    billing_periods_deleted: int
+    fee_records_deleted: int
+    receipt_sequence_reset: bool
+    billing_cycle_reset_to_default: bool

@@ -76,10 +76,10 @@ export function ReversePaymentDialog({
         <form onSubmit={form.handleSubmit((v) => reverse.mutate(v))}>
           <DialogBody>
             <div className="space-y-3">
-              <div className="text-sm text-slate-600">
+              <div className="text-sm text-[#91a1bc]">
                 {payment ? (
                   <div>
-                    Reversing <span className="font-semibold text-slate-900">{payment.receipt_no}</span> ({payment.mode},{' '}
+                    Reversing <span className="font-semibold text-white">{payment.receipt_no}</span> ({payment.mode},{' '}
                     {payment.amount})
                   </div>
                 ) : (
@@ -88,18 +88,18 @@ export function ReversePaymentDialog({
               </div>
 
               <div>
-                <div className="mb-1 text-sm text-slate-600">Reason</div>
+                <div className="mb-2 text-sm font-medium text-[#dbe6ff]">Reason</div>
                 <Input {...form.register('reason')} placeholder="Reason for reversal" />
                 {form.formState.errors.reason ? (
-                  <div className="mt-1 text-xs text-red-600">{form.formState.errors.reason.message}</div>
+                  <div className="mt-1 text-xs text-rose-300">{form.formState.errors.reason.message}</div>
                 ) : null}
               </div>
 
               <div>
-                <div className="mb-1 text-sm text-slate-600">Amount (optional)</div>
+                <div className="mb-2 text-sm font-medium text-[#dbe6ff]">Amount (optional)</div>
                 <Input type="number" step="0.01" {...form.register('amount')} placeholder="Leave blank to reverse full amount" />
                 {form.formState.errors.amount ? (
-                  <div className="mt-1 text-xs text-red-600">{String(form.formState.errors.amount.message)}</div>
+                  <div className="mt-1 text-xs text-rose-300">{String(form.formState.errors.amount.message)}</div>
                 ) : null}
               </div>
             </div>
@@ -118,4 +118,3 @@ export function ReversePaymentDialog({
     </Dialog>
   );
 }
-

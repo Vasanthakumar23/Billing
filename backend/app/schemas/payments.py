@@ -28,15 +28,15 @@ class PaymentRead(BaseModel):
     student_code: str | None = None
     amount: Decimal
     mode: PaymentMode
-    reference_no: str | None
-    notes: str | None
+    reference_no: str | None = None
+    notes: str | None = None
     paid_at: datetime
     created_by: uuid.UUID
     created_at: datetime
-    billing_start_month: date | None
-    billing_cycle_months: int | None
+    billing_start_month: date | None = None
+    billing_cycle_months: int | None = None
     cycle_mode: PaymentCycle | None = None
-    fee_period_label: str | None
+    fee_period_label: str | None = None
 
     class Config:
         from_attributes = True

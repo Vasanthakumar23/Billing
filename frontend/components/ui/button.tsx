@@ -11,16 +11,19 @@ export function Button({ className, variant = 'default', size = 'md', ...props }
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:opacity-50 disabled:pointer-events-none',
-        size === 'sm' ? 'h-8 px-3' : 'h-9 px-4',
-        variant === 'default' && 'bg-slate-900 text-white hover:bg-slate-800',
-        variant === 'secondary' && 'bg-slate-100 text-slate-900 hover:bg-slate-200',
-        variant === 'outline' && 'border border-slate-200 bg-white hover:bg-slate-50',
-        variant === 'destructive' && 'bg-red-600 text-white hover:bg-red-500',
+        'inline-flex items-center justify-center gap-2 rounded-2xl border text-sm font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[rgba(79,124,255,0.45)] disabled:pointer-events-none disabled:opacity-65',
+        size === 'sm' ? 'h-10 px-4' : 'h-12 px-5',
+        variant === 'default' &&
+          'border-transparent bg-[linear-gradient(135deg,#4f7cff_0%,#315bd3_100%)] text-white shadow-[0_18px_44px_rgba(49,91,211,0.35)] hover:-translate-y-0.5 hover:shadow-[0_22px_48px_rgba(49,91,211,0.42)]',
+        variant === 'secondary' &&
+          'border-[rgba(79,124,255,0.16)] bg-[rgba(79,124,255,0.12)] text-[#dbe6ff] hover:bg-[rgba(79,124,255,0.2)]',
+        variant === 'outline' &&
+          'border-[rgba(151,164,187,0.16)] bg-[rgba(255,255,255,0.02)] text-[#f4f7fb] hover:border-[rgba(79,124,255,0.28)] hover:bg-[rgba(79,124,255,0.1)]',
+        variant === 'destructive' &&
+          'border-transparent bg-[linear-gradient(135deg,#ff6c7f_0%,#d93a56_100%)] text-white shadow-[0_18px_40px_rgba(217,58,86,0.28)] hover:-translate-y-0.5',
         className
       )}
       {...props}
     />
   );
 }
-

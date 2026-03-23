@@ -4,11 +4,8 @@ import { LoginClient } from './login-client';
 
 export default function LoginPage() {
   return (
-    <Suspense
-      fallback={<div className="min-h-screen flex items-center justify-center text-sm text-slate-600">Loading…</div>}
-    >
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-sm text-[#91a1bc]">Loading...</div>}>
       <LoginClient />
     </Suspense>
   );
 }
-

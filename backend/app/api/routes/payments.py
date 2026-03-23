@@ -86,12 +86,17 @@ def create_payment(
     db.add(payment)
     try:
         assign_periods_to_payment(db, payment, payload.billing_start_month, cycle_months)
+        db.flush()
+        db.refresh(payment)
+        response = _payment_read(payment)
         db.commit()
     except ValueError as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail=str(exc))
-    db.refresh(payment)
-    return _payment_read(payment)
+    except Exception:
+        db.rollback()
+        raise
+    return response
 
 
 @router.get("", response_model=dict)
@@ -168,10 +173,16 @@ def reverse_payment(
         created_by=current_user.id,
     )
     db.add(reversal)
-    release_payment_periods(original)
-    db.commit()
-    db.refresh(reversal)
-    return _payment_read(reversal)
+    try:
+        release_payment_periods(original)
+        db.flush()
+        db.refresh(reversal)
+        response = _payment_read(reversal)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return response
 
 
 @router.get("/{payment_id}/receipt", response_model=PaymentRead)

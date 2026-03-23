@@ -26,45 +26,45 @@ export function Receipt({ data, onClose }: { data: ReceiptData; onClose: () => v
         </CardHeader>
         <CardContent className="space-y-2">
           <div className="text-sm">
-            <div className="text-slate-600">Receipt No</div>
-            <div className="font-semibold">{data.receipt_no}</div>
+            <div className="text-[#91a1bc]">Receipt No</div>
+            <div className="font-semibold text-white">{data.receipt_no}</div>
           </div>
           <div className="text-sm">
-            <div className="text-slate-600">Student</div>
-            <div className="font-semibold">
+            <div className="text-[#91a1bc]">Student</div>
+            <div className="font-semibold text-white">
               {data.student_name ?? 'Student'}{data.student_code ? ` (${data.student_code})` : ''}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <div className="text-slate-600">Amount</div>
-              <div className="font-semibold">{data.amount}</div>
+              <div className="text-[#91a1bc]">Amount</div>
+              <div className="font-semibold text-white">{data.amount}</div>
             </div>
             <div>
-              <div className="text-slate-600">Mode</div>
-              <div className="font-semibold">{data.mode}</div>
+              <div className="text-[#91a1bc]">Mode</div>
+              <div className="font-semibold text-white">{data.mode}</div>
             </div>
           </div>
           {data.fee_period_label ? (
             <div className="text-sm">
-              <div className="text-slate-600">Fee Period</div>
-              <div className="font-semibold">{data.fee_period_label}</div>
+              <div className="text-[#91a1bc]">Fee Period</div>
+              <div className="font-semibold text-white">{data.fee_period_label}</div>
             </div>
           ) : null}
           <div className="text-sm">
-            <div className="text-slate-600">Paid At</div>
-            <div className="font-semibold">{new Date(data.paid_at).toLocaleString()}</div>
+            <div className="text-[#91a1bc]">Paid At</div>
+            <div className="font-semibold text-white">{new Date(data.paid_at).toLocaleString()}</div>
           </div>
           {data.reference_no ? (
             <div className="text-sm">
-              <div className="text-slate-600">Reference</div>
-              <div className="font-semibold">{data.reference_no}</div>
+              <div className="text-[#91a1bc]">Reference</div>
+              <div className="font-semibold text-white">{data.reference_no}</div>
             </div>
           ) : null}
           {data.notes ? (
             <div className="text-sm">
-              <div className="text-slate-600">Notes</div>
-              <div className="font-semibold">{data.notes}</div>
+              <div className="text-[#91a1bc]">Notes</div>
+              <div className="font-semibold text-white">{data.notes}</div>
             </div>
           ) : null}
         </CardContent>

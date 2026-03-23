@@ -144,26 +144,26 @@ export default function StudentDetailPage() {
   });
 
   return (
-    <AppShell title="Student">
+    <AppShell title="Student Profile" subtitle="Review fee settings, pending months, and full payment history for this student.">
       {student.isLoading ? (
-        <div className="flex items-center gap-2 text-sm text-slate-600">
+        <div className="flex items-center gap-2 text-sm text-[#91a1bc]">
           <Spinner /> Loading
         </div>
       ) : student.isError ? (
-        <div className="text-sm text-red-600">Student not found</div>
+        <div className="text-sm text-rose-300">Student not found</div>
       ) : (
         <div className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>
-                {student.data?.name} <span className="text-slate-400">({student.data?.student_code})</span>
+                {student.data?.name} <span className="text-[#7f8da9]">({student.data?.student_code})</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="flex items-center justify-between gap-3">
-              <div className="text-sm text-slate-600">
+              <div className="text-sm text-[#91a1bc]">
                 {student.data?.class_name ?? '-'} {student.data?.section ?? ''}
               </div>
-              <Badge className={student.data?.status === 'active' ? '' : 'bg-slate-100 text-slate-500'}>
+              <Badge className={student.data?.status === 'active' ? 'bg-[rgba(46,216,143,0.16)] text-[#48e69b]' : 'bg-[rgba(151,164,187,0.08)] text-[#9aa8c2]'}>
                 {student.data?.status}
               </Badge>
             </CardContent>
@@ -201,18 +201,18 @@ export default function StudentDetailPage() {
               <CardTitle>Billing Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="text-sm text-slate-600">
+              <div className="text-sm text-[#91a1bc]">
                 Current cycle: {overview.data?.cycle_mode?.replaceAll('_', ' ')} ({overview.data?.cycle_months ?? 0} months)
               </div>
               <div className="flex flex-wrap gap-2">
                 {overview.data?.pending_months.length ? (
                   overview.data.pending_months.map((month) => (
-                    <Badge key={month.month} className="bg-amber-50 text-amber-800 hover:bg-amber-50">
+                    <Badge key={month.month} className="bg-[rgba(255,177,74,0.14)] text-[#ffbf6e]">
                       {month.label}
                     </Badge>
                   ))
                 ) : (
-                  <div className="text-sm text-slate-600">No pending months in the current billing window.</div>
+                  <div className="text-sm text-[#91a1bc]">No pending months in the current billing window.</div>
                 )}
               </div>
             </CardContent>
@@ -253,7 +253,7 @@ export default function StudentDetailPage() {
               <CardTitle>Payment History</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-auto rounded-md border border-slate-200">
+              <div className="overflow-auto rounded-[24px] border border-[rgba(151,164,187,0.08)] bg-[rgba(255,255,255,0.02)]">
                 <Table>
                   <THead>
                     <tr>
@@ -270,14 +270,14 @@ export default function StudentDetailPage() {
                     {payments.isLoading ? (
                       <tr>
                         <TD colSpan={7}>
-                          <div className="flex items-center gap-2 text-sm text-slate-600">
+                          <div className="flex items-center gap-2 text-sm text-[#91a1bc]">
                             <Spinner /> Loading
                           </div>
                         </TD>
                       </tr>
                     ) : payments.isError ? (
                       <tr>
-                        <TD colSpan={7} className="text-sm text-red-600">
+                        <TD colSpan={7} className="text-sm text-rose-300">
                           Failed to load payments
                         </TD>
                       </tr>
@@ -288,7 +288,7 @@ export default function StudentDetailPage() {
                           <TD>{p.fee_period_label ?? '-'}</TD>
                           <TD>{new Date(p.paid_at).toLocaleString()}</TD>
                           <TD>{p.mode}</TD>
-                          <TD className={Number(p.amount) < 0 ? 'text-red-600' : ''}>{p.amount}</TD>
+                          <TD className={Number(p.amount) < 0 ? 'font-semibold text-rose-300' : 'font-semibold text-white'}>{p.amount}</TD>
                           <TD className="max-w-[320px] truncate" title={p.notes ?? ''}>
                             {p.notes ?? ''}
                           </TD>
@@ -320,7 +320,7 @@ export default function StudentDetailPage() {
                       ))
                     ) : (
                       <tr>
-                        <TD colSpan={7} className="text-sm text-slate-600">
+                        <TD colSpan={7} className="text-sm text-[#91a1bc]">
                           No payments
                         </TD>
                       </tr>
@@ -330,7 +330,7 @@ export default function StudentDetailPage() {
               </div>
 
               <div className="mt-3 flex items-center justify-between">
-                <div className="text-sm text-slate-600">
+                <div className="text-sm text-[#91a1bc]">
                   Page {page} / {paymentTotalPages}
                 </div>
                 <div className="flex gap-2">
@@ -358,15 +358,15 @@ export default function StudentDetailPage() {
               <form onSubmit={feeForm.handleSubmit((v) => updateFee.mutate(v))}>
                 <DialogBody>
                   <div>
-                    <div className="mb-1 text-sm text-slate-600">Monthly Fee</div>
+                    <div className="mb-2 text-sm font-medium text-[#dbe6ff]">Monthly Fee</div>
                     <input
                       type="number"
                       step="0.01"
-                      className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                      className="h-12 w-full rounded-2xl border border-[rgba(151,164,187,0.14)] bg-[rgba(255,255,255,0.04)] px-4 text-sm text-white outline-none"
                       {...feeForm.register('expected_fee_amount')}
                     />
                     {feeForm.formState.errors.expected_fee_amount ? (
-                      <div className="mt-1 text-xs text-red-600">{feeForm.formState.errors.expected_fee_amount.message}</div>
+                      <div className="mt-1 text-xs text-rose-300">{feeForm.formState.errors.expected_fee_amount.message}</div>
                     ) : null}
                   </div>
                 </DialogBody>
@@ -389,7 +389,7 @@ export default function StudentDetailPage() {
                 <DialogTitle>Mark Student Inactive</DialogTitle>
               </DialogHeader>
               <DialogBody>
-                <div className="text-sm text-slate-600">
+                <div className="text-sm text-[#91a1bc]">
                   This keeps all billing history but removes the student from the active list. Only inactive students become eligible for permanent deletion.
                 </div>
               </DialogBody>
@@ -411,7 +411,7 @@ export default function StudentDetailPage() {
                 <DialogTitle>Permanently Delete Student</DialogTitle>
               </DialogHeader>
               <DialogBody>
-                <div className="text-sm text-slate-600">
+                <div className="text-sm text-[#91a1bc]">
                   This permanently removes the inactive student record. The action is blocked if any payment history exists.
                 </div>
               </DialogBody>

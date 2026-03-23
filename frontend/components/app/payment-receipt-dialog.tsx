@@ -30,11 +30,11 @@ export function PaymentReceiptDialog({
         </DialogHeader>
         <DialogBody>
           {receipt.isLoading ? (
-            <div className="flex items-center gap-2 text-sm text-slate-600">
+            <div className="flex items-center gap-2 text-sm text-[#91a1bc]">
               <Spinner /> Loading
             </div>
           ) : receipt.isError ? (
-            <div className="text-sm text-red-600">Failed to load receipt</div>
+            <div className="text-sm text-rose-300">Failed to load receipt</div>
           ) : receipt.data ? (
             <Receipt data={receipt.data} onClose={() => onOpenChange(false)} />
           ) : null}
