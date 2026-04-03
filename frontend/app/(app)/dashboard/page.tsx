@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowUpRight, CheckCircle2, Download, UserX2, Users } from 'lucide-react';
+import { CheckCircle2, Download, UserX2, Users } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
 import { AppShell } from '@/components/app/shell';
@@ -67,7 +67,7 @@ export default function DashboardPage() {
       value: summary.data?.active_students?.toString() ?? studentCount.data?.total?.toString() ?? '-',
       caption: 'Active students in selected month window',
       icon: Users,
-      tone: 'text-[#8ce0ff]'
+      tone: 'text-[#dbe6ff]'
     }
   ];
 
@@ -98,56 +98,47 @@ export default function DashboardPage() {
               const Icon = item.icon;
               return (
                 <Card key={item.label} className="metric-card">
-                  <CardContent className="space-y-6">
+                  <CardContent className="space-y-5">
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <div className="text-sm font-medium text-[#9aa8c2]">{item.label}</div>
-                        <div className="mt-4 text-4xl font-bold text-white">{item.value ?? '-'}</div>
+                        <div className="theme-heading mt-3 text-3xl font-semibold">{item.value ?? '-'}</div>
                       </div>
-                      <div className="rounded-2xl border border-[rgba(79,124,255,0.16)] bg-[rgba(79,124,255,0.12)] p-3">
+                      <div className="theme-subtle-surface rounded-xl p-3">
                         <Icon className={`h-6 w-6 ${item.tone}`} />
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-[#8ea0bf]">
-                      <ArrowUpRight className="h-4 w-4 text-[#4f7cff]" />
-                      {item.caption}
-                    </div>
+                    <div className="text-sm text-[#8ea0bf]">{item.caption}</div>
                   </CardContent>
                 </Card>
               );
             })}
             <Card className="metric-card">
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-sm font-medium text-[#9aa8c2]">Students Paid</div>
-                    <div className="mt-4 text-4xl font-bold text-white">{summary.data?.paid_students ?? '-'}</div>
+                    <div className="theme-heading mt-3 text-3xl font-semibold">{summary.data?.paid_students ?? '-'}</div>
                   </div>
-                  <div className="rounded-2xl border border-[rgba(46,216,143,0.16)] bg-[rgba(46,216,143,0.12)] p-3">
-                    <CheckCircle2 className="h-6 w-6 text-[#2ed88f]" />
+                  <div className="rounded-xl border border-[rgba(31,157,103,0.16)] bg-[rgba(31,157,103,0.1)] p-3">
+                    <CheckCircle2 className="h-6 w-6 text-[#8ee0b8]" />
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-[#8ea0bf]">
-                  <ArrowUpRight className="h-4 w-4 text-[#2ed88f]" />
-                  Students paid for {monthLabel(month)}
-                </div>
+                <div className="text-sm text-[#8ea0bf]">Students paid for {monthLabel(month)}</div>
               </CardContent>
             </Card>
             <Card className="metric-card">
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-sm font-medium text-[#9aa8c2]">Students Not Paid</div>
-                    <div className="mt-4 text-4xl font-bold text-white">{summary.data?.unpaid_students ?? '-'}</div>
+                    <div className="theme-heading mt-3 text-3xl font-semibold">{summary.data?.unpaid_students ?? '-'}</div>
                   </div>
-                  <div className="rounded-2xl border border-[rgba(255,177,74,0.16)] bg-[rgba(255,177,74,0.12)] p-3">
-                    <UserX2 className="h-6 w-6 text-[#ffb14a]" />
+                  <div className="rounded-xl border border-[rgba(183,121,31,0.16)] bg-[rgba(183,121,31,0.1)] p-3">
+                    <UserX2 className="h-6 w-6 text-[#e7c07a]" />
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-[#8ea0bf]">
-                  <ArrowUpRight className="h-4 w-4 text-[#ffb14a]" />
-                  Students pending for {monthLabel(month)}
-                </div>
+                <div className="text-sm text-[#8ea0bf]">Students pending for {monthLabel(month)}</div>
               </CardContent>
             </Card>
           </div>
@@ -170,7 +161,7 @@ export default function DashboardPage() {
               ) : recentPayments.isError ? (
                 <div className="text-sm text-rose-300">Failed to load recent payments</div>
               ) : (
-                <div className="overflow-auto rounded-[24px] border border-[rgba(151,164,187,0.08)] bg-[rgba(255,255,255,0.02)]">
+                <div className="theme-table-wrap overflow-auto rounded-xl">
                   <Table>
                     <THead>
                       <tr>
@@ -186,7 +177,7 @@ export default function DashboardPage() {
                       {recentPayments.data?.items.map((payment) => (
                         <tr key={payment.id}>
                           <TD>{payment.student_code ?? '-'}</TD>
-                          <TD className="font-semibold text-white">{payment.student_name ?? '-'}</TD>
+                          <TD className="theme-heading font-semibold">{payment.student_name ?? '-'}</TD>
                           <TD>{payment.receipt_no}</TD>
                           <TD>{payment.fee_period_label ?? '-'}</TD>
                           <TD>{new Date(payment.paid_at).toLocaleString()}</TD>

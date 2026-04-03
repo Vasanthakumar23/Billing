@@ -234,44 +234,44 @@ export default function CollectPage() {
                   <div className="text-sm text-rose-300">Failed to load student billing data</div>
                 ) : (
                   <>
-                    <div className="flex items-center justify-between gap-3 rounded-[24px] border border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] p-4">
+                    <div className="theme-subtle-surface flex items-center justify-between gap-3 rounded-[24px] p-4">
                       <div>
-                        <div className="font-semibold text-white">
+                        <div className="theme-heading font-semibold">
                           {selectedStudent?.name} ({selectedStudent?.student_code})
                         </div>
                         <div className="text-sm text-[#91a1bc]">Roll number confirms which student this payment belongs to</div>
                       </div>
-                      <Badge className={selectedStudent?.status === 'active' ? 'bg-[rgba(46,216,143,0.16)] text-[#48e69b]' : 'bg-[rgba(151,164,187,0.08)] text-[#9aa8c2]'}>
+                      <Badge className={selectedStudent?.status === 'active' ? 'theme-chip-success' : 'theme-chip-neutral'}>
                         {selectedStudent?.status}
                       </Badge>
                     </div>
 
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                      <div className="rounded-[24px] border border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] p-4">
+                      <div className="theme-subtle-surface rounded-[24px] p-4">
                         <div className="text-xs text-[#7484a1]">Monthly Fee</div>
-                        <div className="mt-2 font-semibold text-white">{overview.data?.monthly_fee}</div>
+                        <div className="theme-heading mt-2 font-semibold">{overview.data?.monthly_fee}</div>
                       </div>
-                      <div className="rounded-[24px] border border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] p-4">
+                      <div className="theme-subtle-surface rounded-[24px] p-4">
                         <div className="text-xs text-[#7484a1]">Payable Now</div>
-                        <div className="mt-2 font-semibold text-white">{payableAmount}</div>
+                        <div className="theme-heading mt-2 font-semibold">{payableAmount}</div>
                       </div>
                     </div>
 
-                    <div className="rounded-[24px] border border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] p-4">
+                    <div className="theme-subtle-surface rounded-[24px] p-4">
                         <div className="text-xs text-[#7484a1]">Next unpaid month</div>
-                        <div className="mt-2 font-semibold text-white">{overview.data?.next_unpaid_label}</div>
+                        <div className="theme-heading mt-2 font-semibold">{overview.data?.next_unpaid_label}</div>
                       </div>
 
                     <div>
-                      <div className="mb-2 text-sm font-medium text-white">Month status</div>
+                      <div className="theme-heading mb-2 text-sm font-medium">Month status</div>
                       <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-4">
                         {overview.data?.months.map((month) => (
                           <div
                             key={month.month}
                             className={`rounded-md border p-2 text-sm ${
                               month.is_paid
-                                ? 'border-[rgba(46,216,143,0.18)] bg-[rgba(46,216,143,0.12)] text-[#70edb4]'
-                                : 'border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] text-[#dbe6ff]'
+                                ? 'theme-chip-success border-transparent'
+                                : 'theme-subtle-surface text-[var(--heading)]'
                             }`}
                           >
                             <div className="font-medium">{month.label}</div>
@@ -291,14 +291,14 @@ export default function CollectPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5 text-[#9cb4ff]" />
+                <CreditCard className="h-5 w-5 text-[var(--accent)]" />
                 Payment
               </CardTitle>
             </CardHeader>
             <CardContent>
               <form className="space-y-3" onSubmit={form.handleSubmit((v) => createPayment.mutate(v))}>
                 <div>
-                  <div className="mb-2 text-sm font-medium text-[#dbe6ff]">Student roll no</div>
+                  <div className="theme-heading mb-2 text-sm font-medium">Student roll no</div>
                   <div className="flex gap-2">
                     <Input
                       value={form.watch('student_code')}
@@ -320,7 +320,7 @@ export default function CollectPage() {
                     <div className="space-y-3">
                       {carryForwardMonths.length ? (
                         <div>
-                          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#ffbf6e]">Carry Forward Pending</div>
+                          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--chip-warn-text)]">Carry Forward Pending</div>
                           <div className="flex flex-wrap gap-2">
                             {carryForwardMonths.map((month) => {
                               const active = selectedMonths.includes(month.month);
@@ -331,8 +331,8 @@ export default function CollectPage() {
                                   onClick={() => toggleMonth(month.month)}
                                   className={`min-w-[120px] rounded-2xl border px-3 py-3 text-left text-sm transition-colors ${
                                     active
-                                      ? 'border-[rgba(255,177,74,0.42)] bg-[rgba(255,177,74,0.18)] text-white'
-                                      : 'border-[rgba(255,177,74,0.24)] bg-[rgba(255,177,74,0.08)] text-[#ffbf6e]'
+                                      ? 'theme-chip-warn border-[rgba(183,121,31,0.22)] text-[var(--heading)]'
+                                      : 'theme-chip-warn border-[rgba(183,121,31,0.14)]'
                                   }`}
                                 >
                                   <div className="font-medium">{month.label}</div>
@@ -346,7 +346,7 @@ export default function CollectPage() {
 
                       {cycleMonths.length ? (
                         <div>
-                          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#9cb4ff]">
+                          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">
                             Current Cycle - {selectedCycleMonths}
                           </div>
                           <div className="flex flex-wrap gap-2">
@@ -359,8 +359,8 @@ export default function CollectPage() {
                                   onClick={() => toggleMonth(month.month)}
                                   className={`min-w-[120px] rounded-2xl border px-3 py-3 text-left text-sm transition-colors ${
                                     active
-                                      ? 'border-[rgba(79,124,255,0.32)] bg-[rgba(79,124,255,0.16)] text-white'
-                                      : 'border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] text-[#91a1bc]'
+                                      ? 'border-[rgba(47,111,237,0.24)] bg-[var(--accent-soft)] text-[var(--heading)]'
+                                      : 'theme-subtle-surface text-[var(--muted)]'
                                   }`}
                                 >
                                   <div className="font-medium">{month.label}</div>
@@ -384,9 +384,9 @@ export default function CollectPage() {
                   ) : null}
                 </div>
                 <div>
-                  <div className="mb-2 text-sm font-medium text-[#dbe6ff]">Mode</div>
+                  <div className="theme-heading mb-2 text-sm font-medium">Mode</div>
                   <select
-                    className="h-12 w-full rounded-2xl border border-[rgba(151,164,187,0.14)] bg-[rgba(255,255,255,0.04)] px-4 text-sm text-white outline-none"
+                    className="theme-select h-12 w-full rounded-2xl px-4 text-sm outline-none"
                     {...form.register('mode')}
                   >
                     <option value="cash">Cash</option>
@@ -395,11 +395,11 @@ export default function CollectPage() {
                   </select>
                 </div>
                 <div>
-                  <div className="mb-2 text-sm font-medium text-[#dbe6ff]">Reference</div>
+                  <div className="theme-heading mb-2 text-sm font-medium">Reference</div>
                   <Input {...form.register('reference_no')} />
                 </div>
                 <div>
-                  <div className="mb-2 text-sm font-medium text-[#dbe6ff]">Notes</div>
+                  <div className="theme-heading mb-2 text-sm font-medium">Notes</div>
                   <Input {...form.register('notes')} />
                 </div>
                 <Button type="submit" disabled={createPayment.isPending || !selectedStudent?.id || selectedMonths.length === 0}>

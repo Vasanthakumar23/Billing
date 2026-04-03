@@ -87,17 +87,17 @@ export default function ReportsPage() {
             <CardTitle>Monthly Report Filters</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-[220px_220px_180px_minmax(0,1fr)_150px_150px]">
-            <div className="rounded-2xl border border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
-              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-white">
+            <div className="theme-subtle-surface rounded-2xl px-4 py-3">
+              <div className="theme-heading mb-2 flex items-center gap-2 text-sm font-semibold">
                 <Filter className="h-4 w-4 text-[#4f7cff]" />
                 Month
               </div>
               <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
             </div>
-            <div className="rounded-2xl border border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
-              <div className="mb-2 text-sm font-semibold text-white">Status</div>
+            <div className="theme-subtle-surface rounded-2xl px-4 py-3">
+              <div className="theme-heading mb-2 text-sm font-semibold">Status</div>
               <select
-                className="h-12 w-full rounded-2xl border border-[rgba(151,164,187,0.14)] bg-[rgba(255,255,255,0.04)] px-4 text-sm text-white outline-none"
+                className="theme-select h-12 w-full rounded-2xl px-4 text-sm outline-none"
                 value={paymentState}
                 onChange={(e) => setPaymentState(e.target.value as 'paid' | 'unpaid' | 'all')}
               >
@@ -106,16 +106,16 @@ export default function ReportsPage() {
                 <option value="all">All</option>
               </select>
             </div>
-            <div className="rounded-2xl border border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
-              <div className="mb-2 text-sm font-semibold text-white">Class ID</div>
+            <div className="theme-subtle-surface rounded-2xl px-4 py-3">
+              <div className="theme-heading mb-2 text-sm font-semibold">Class ID</div>
               <Input
                 value={classCode}
                 onChange={(e) => setClassCode(e.target.value.replace(/\D/g, '').slice(0, 2))}
                 placeholder="05"
               />
             </div>
-            <div className="rounded-2xl border border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
-              <div className="mb-2 text-sm font-semibold text-white">Search</div>
+            <div className="theme-subtle-surface rounded-2xl px-4 py-3">
+              <div className="theme-heading mb-2 text-sm font-semibold">Search</div>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7484a1]" />
                 <Input
@@ -126,13 +126,13 @@ export default function ReportsPage() {
                 />
               </div>
             </div>
-            <div className="rounded-2xl border border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
-              <div className="mb-2 text-sm font-semibold text-white">Paid</div>
-              <div className="text-3xl font-bold text-white">{paidCount}</div>
+            <div className="theme-subtle-surface rounded-2xl px-4 py-3">
+              <div className="theme-heading mb-2 text-sm font-semibold">Paid</div>
+              <div className="theme-heading text-3xl font-bold">{paidCount}</div>
             </div>
-            <div className="rounded-2xl border border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
-              <div className="mb-2 text-sm font-semibold text-white">Not Paid</div>
-              <div className="text-3xl font-bold text-white">{unpaidCount}</div>
+            <div className="theme-subtle-surface rounded-2xl px-4 py-3">
+              <div className="theme-heading mb-2 text-sm font-semibold">Not Paid</div>
+              <div className="theme-heading text-3xl font-bold">{unpaidCount}</div>
             </div>
           </CardContent>
         </Card>
@@ -145,10 +145,10 @@ export default function ReportsPage() {
                 Showing {paymentState === 'all' ? 'all students' : paymentState === 'paid' ? 'paid students' : 'students not paid'} for {monthLabel(month)}
               </div>
             </div>
-            <Badge className="bg-[rgba(79,124,255,0.16)] text-[#a7c1ff]">{monthLabel(month)}</Badge>
+            <Badge className="theme-chip-neutral">{monthLabel(month)}</Badge>
           </CardHeader>
           <CardContent>
-            <div className="overflow-auto rounded-[24px] border border-[rgba(151,164,187,0.08)] bg-[rgba(255,255,255,0.02)]">
+            <div className="theme-table-wrap overflow-auto rounded-[24px]">
               <Table>
                 <THead>
                   <tr>
@@ -181,7 +181,7 @@ export default function ReportsPage() {
                     students.data.map((student) => (
                       <tr key={student.student_id}>
                         <TD>{student.student_code}</TD>
-                        <TD className="font-semibold text-white">{student.name}</TD>
+                        <TD className="theme-heading font-semibold">{student.name}</TD>
                         <TD>{student.class_name ?? '-'}{student.section ? ` ${student.section}` : ''}</TD>
                         <TD>{student.payment_period}</TD>
                         <TD>{student.monthly_fee}</TD>
@@ -190,8 +190,8 @@ export default function ReportsPage() {
                           <Badge
                             className={
                               student.is_paid
-                                ? 'bg-[rgba(46,216,143,0.16)] text-[#48e69b]'
-                                : 'bg-[rgba(255,177,74,0.16)] text-[#ffbf6e]'
+                                ? 'theme-chip-success'
+                                : 'theme-chip-warn'
                             }
                           >
                             {student.is_paid ? 'Paid' : 'Not Paid'}

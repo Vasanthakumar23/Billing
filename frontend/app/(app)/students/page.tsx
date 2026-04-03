@@ -130,7 +130,7 @@ export default function StudentsPage() {
                 placeholder="Class code, e.g. 05"
               />
               <select
-                className="h-12 rounded-2xl border border-[rgba(151,164,187,0.14)] bg-[rgba(255,255,255,0.04)] px-4 text-sm text-white outline-none"
+                className="theme-select h-12 rounded-2xl px-4 text-sm outline-none"
                 value={status}
                 onChange={(e) => {
                   setStatus(e.target.value as 'all' | 'active' | 'inactive');
@@ -143,17 +143,17 @@ export default function StudentsPage() {
               </select>
             </div>
             <div className="text-xs text-[#91a1bc]">
-              Use the class filter for roll numbers where the first two digits represent the class, for example <span className="text-white">05xx</span>.
+              Use the class filter for roll numbers where the first two digits represent the class, for example <span className="theme-heading">05xx</span>.
             </div>
             <div className="text-sm text-[#91a1bc]">
-              Showing <span className="font-semibold text-white">{query.data?.total ?? 0}</span> student records
+              Showing <span className="theme-heading font-semibold">{query.data?.total ?? 0}</span> student records
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent>
-            <div className="overflow-auto rounded-[24px] border border-[rgba(151,164,187,0.08)] bg-[rgba(255,255,255,0.02)]">
+            <div className="theme-table-wrap overflow-auto rounded-[24px]">
               <Table>
                 <THead>
                   <tr>
@@ -186,21 +186,21 @@ export default function StudentsPage() {
                     query.data.items.map((s) => (
                       <tr key={s.id}>
                         <TD>
-                          <div className="font-semibold text-white">{s.name}</div>
+                          <div className="theme-heading font-semibold">{s.name}</div>
                           <div className="mt-1 text-sm text-[#91a1bc]">{s.student_code}</div>
                         </TD>
                         <TD>{s.class_name ?? '-'} {s.section ?? ''}</TD>
                         <TD>{s.expected_fee}</TD>
                         <TD>
-                          <div className="text-sm font-medium text-white">{s.last_paid_label ?? '-'}</div>
+                          <div className="theme-heading text-sm font-medium">{s.last_paid_label ?? '-'}</div>
                         </TD>
                         <TD>
                           {s.next_due_label ? (
                             <div
                               className={
                                 s.next_due_state === 'pending'
-                                  ? 'inline-flex rounded-full bg-[rgba(245,158,11,0.14)] px-3 py-1 text-sm font-medium text-amber-200'
-                                  : 'inline-flex rounded-full bg-[rgba(96,122,255,0.14)] px-3 py-1 text-sm font-medium text-[#c8d7ff]'
+                                  ? 'theme-chip-warn inline-flex rounded-full px-3 py-1 text-sm font-medium'
+                                  : 'theme-chip-neutral inline-flex rounded-full px-3 py-1 text-sm font-medium'
                               }
                             >
                               {s.next_due_label}
@@ -211,14 +211,14 @@ export default function StudentsPage() {
                         </TD>
                         <TD className={Number(s.pending) > 0 ? 'font-semibold text-white' : ''}>{s.pending}</TD>
                         <TD>
-                          <Badge className={s.status === 'active' ? 'bg-[rgba(46,216,143,0.16)] text-[#48e69b]' : 'bg-[rgba(151,164,187,0.08)] text-[#9aa8c2]'}>
+                          <Badge className={s.status === 'active' ? 'theme-chip-success' : 'theme-chip-neutral'}>
                             {s.status}
                           </Badge>
                         </TD>
                         <TD>
                           <Link
                             href={`/students/${s.id}`}
-                            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(96,122,255,0.2)] bg-[rgba(96,122,255,0.12)] text-[#c8d7ff] transition-colors hover:bg-[rgba(96,122,255,0.2)] hover:text-white"
+                            className="theme-chip-neutral inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--heading)]"
                             aria-label={`View profile for ${s.name}`}
                             title={`View profile for ${s.name}`}
                           >
@@ -264,20 +264,20 @@ export default function StudentsPage() {
             <DialogBody>
               <div className="grid gap-4">
                 <div>
-                  <div className="mb-2 text-sm font-medium text-[#dbe6ff]">Roll Number</div>
+                  <div className="theme-heading mb-2 text-sm font-medium">Roll Number</div>
                   <Input {...form.register('student_code')} />
                 </div>
                 <div>
-                  <div className="mb-2 text-sm font-medium text-[#dbe6ff]">Student Name</div>
+                  <div className="theme-heading mb-2 text-sm font-medium">Student Name</div>
                   <Input {...form.register('name')} />
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <div className="mb-2 text-sm font-medium text-[#dbe6ff]">Class</div>
+                    <div className="theme-heading mb-2 text-sm font-medium">Class</div>
                     <Input {...form.register('class_name')} />
                   </div>
                   <div>
-                    <div className="mb-2 text-sm font-medium text-[#dbe6ff]">Section</div>
+                    <div className="theme-heading mb-2 text-sm font-medium">Section</div>
                     <Input {...form.register('section')} />
                   </div>
                 </div>

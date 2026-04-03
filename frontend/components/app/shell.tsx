@@ -3,7 +3,6 @@
 import {
   Banknote,
   BarChart3,
-  CreditCard,
   HandCoins,
   LayoutDashboard,
   LogOut,
@@ -60,18 +59,15 @@ export function AppShell({
 
   return (
     <div className="min-h-screen lg:grid lg:h-screen lg:grid-cols-[290px_minmax(0,1fr)] lg:overflow-hidden">
-      <aside className="flex flex-col border-b border-[rgba(151,164,187,0.1)] bg-[rgba(8,11,18,0.75)] px-5 py-5 backdrop-blur lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r">
-        <div className="flex items-center gap-4 px-2 py-3">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#4f7cff_0%,#315bd3_100%)] shadow-[0_16px_40px_rgba(49,91,211,0.3)]">
-            <CreditCard className="h-7 w-7 text-white" />
-          </div>
+      <aside className="theme-sidebar flex flex-col border-b px-5 py-5 backdrop-blur lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r">
+        <div className="px-2 py-3">
           <div>
-            <div className="font-[var(--font-display)] text-2xl font-bold text-white">BillFlow</div>
-            <div className="text-sm text-[#8ea0bf]">Institution Billing Suite</div>
+            <div className="theme-sidebar-brand font-[var(--font-display)] text-xl font-semibold">MYACADEMY</div>
+            <div className="theme-sidebar-subtitle text-sm">Institution Billing Suite</div>
           </div>
         </div>
 
-        <nav className="mt-8 grid gap-2">
+        <nav className="mt-8 grid gap-1.5">
           {nav.map((item) => {
             const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
             const Icon = item.icon;
@@ -80,27 +76,27 @@ export function AppShell({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200',
+                  'theme-nav-item flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-colors duration-150',
                   active
-                    ? 'bg-[linear-gradient(135deg,rgba(79,124,255,0.88)_0%,rgba(49,91,211,0.76)_100%)] text-white shadow-[0_18px_40px_rgba(49,91,211,0.18)]'
-                    : 'text-[#a5b3cc] hover:bg-[rgba(255,255,255,0.03)] hover:text-white'
+                    ? 'theme-nav-item-active shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                    : 'border-transparent'
                 )}
               >
-                <Icon className="h-5 w-5" />
+                <Icon className="h-[18px] w-[18px]" />
                 {item.label}
               </Link>
             );
           })}
         </nav>
 
-        <div className="mt-8 border-t border-[rgba(151,164,187,0.1)] pt-5 lg:mt-auto lg:pt-6">
-          <Button variant="outline" className="mb-3 w-full justify-start" onClick={toggleTheme}>
+        <div className="mt-8 border-t border-[var(--sidebar-border)] pt-5 lg:mt-auto lg:pt-6">
+          <Button variant="secondary" className="mb-3 w-full justify-start text-white [&_svg]:text-[#dbe6ff]" onClick={toggleTheme}>
             {theme === 'dark' ? <SunMedium className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
           </Button>
           <Button
             variant="outline"
-            className="w-full justify-start"
+            className="w-full justify-start text-[#172033] [&_svg]:text-[#172033]"
             onClick={async () => {
               await fetch('/api/auth/logout', { method: 'POST' });
               window.location.assign('/login');
@@ -116,9 +112,8 @@ export function AppShell({
         <div className="mx-auto max-w-7xl">
           <div className="mb-7 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <div className="section-label">Operations</div>
-              <h1 className="mt-2 text-4xl font-bold tracking-[-0.04em] text-white sm:text-5xl">{title}</h1>
-              {subtitle ? <p className="mt-3 max-w-2xl text-lg text-[#91a1bc]">{subtitle}</p> : null}
+              <h1 className="theme-heading text-3xl font-semibold tracking-[-0.03em] sm:text-4xl">{title}</h1>
+              {subtitle ? <p className="mt-3 max-w-2xl text-base text-[#91a1bc]">{subtitle}</p> : null}
             </div>
             {action ? <div className="shrink-0">{action}</div> : null}
           </div>
