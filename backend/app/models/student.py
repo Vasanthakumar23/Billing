@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
-from sqlalchemy import DateTime, Enum, String
+from sqlalchemy import Date, DateTime, Enum, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -12,10 +12,15 @@ from app.models.enums import StudentStatus
 class Student(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "students"
 
+    serial_no: Mapped[int | None] = mapped_column(Integer, nullable=True)
     student_code: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     class_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     section: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    payment_period: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    joined_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    batch: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    batch_start_month: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[StudentStatus] = mapped_column(
         Enum(StudentStatus, name="student_status"), nullable=False, default=StudentStatus.active
     )

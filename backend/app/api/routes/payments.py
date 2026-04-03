@@ -17,12 +17,13 @@ from app.models.student import Student
 from app.models.user import User
 from app.schemas.payments import PaymentCreate, PaymentRead, PaymentReverseRequest
 from app.services.billing import (
+    add_months,
     assign_periods_to_payment,
     cycle_mode_for_months,
-    cycle_months_for,
     fee_period_label,
-    get_billing_settings,
+    fee_period_label_for_months,
     get_student_monthly_fee,
+    payment_period_months,
     release_payment_periods,
 )
 
@@ -62,9 +63,13 @@ def create_payment(
     if payload.student_id and student.id != payload.student_id:
         raise HTTPException(status_code=409, detail="Student ID and roll number do not match")
 
-    settings = get_billing_settings(db)
-    selected_cycle_mode = payload.cycle_mode or settings.cycle_mode
-    cycle_months = cycle_months_for(selected_cycle_mode)
+    selected_months = sorted({month for month in payload.selected_months})
+    if not selected_months and payload.billing_start_month:
+        cycle_months = payment_period_months(student.payment_period)
+        selected_months = [add_months(payload.billing_start_month, offset) for offset in range(cycle_months)]
+    if not selected_months:
+        raise HTTPException(status_code=422, detail="Select at least one month to record payment")
+    cycle_months = len(selected_months)
     monthly_fee = get_student_monthly_fee(db, student.id)
     amount = monthly_fee * Decimal(cycle_months)
     if amount == 0:
@@ -78,14 +83,14 @@ def create_payment(
         mode=payload.mode,
         reference_no=payload.reference_no,
         notes=payload.notes,
-        billing_start_month=payload.billing_start_month,
+        billing_start_month=selected_months[0],
         billing_cycle_months=cycle_months,
         paid_at=payload.paid_at or datetime.now(UTC),
         created_by=current_user.id,
     )
     db.add(payment)
     try:
-        assign_periods_to_payment(db, payment, payload.billing_start_month, cycle_months)
+        assign_periods_to_payment(db, student, payment, selected_months)
         db.flush()
         db.refresh(payment)
         response = _payment_read(payment)
@@ -207,7 +212,8 @@ def download_receipt_pdf(
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
     student = db.get(Student, payment.student_id)
-    period_label = fee_period_label(payment.billing_start_month, payment.billing_cycle_months) or "N/A"
+    selected_months = [period.period_month for period in payment.billing_periods]
+    period_label = fee_period_label_for_months(selected_months) or fee_period_label(payment.billing_start_month, payment.billing_cycle_months) or "N/A"
     pdf = _render_receipt_pdf(
         receipt_no=payment.receipt_no,
         student_name=student.name if student else "Unknown Student",
@@ -225,7 +231,8 @@ def _payment_read(payment: Payment) -> PaymentRead:
     data["student_name"] = payment.student.name if payment.student else None
     data["student_code"] = payment.student.student_code if payment.student else None
     data["cycle_mode"] = cycle_mode_for_months(payment.billing_cycle_months)
-    data["fee_period_label"] = fee_period_label(payment.billing_start_month, payment.billing_cycle_months)
+    selected_months = [period.period_month for period in payment.billing_periods]
+    data["fee_period_label"] = fee_period_label_for_months(selected_months) or fee_period_label(payment.billing_start_month, payment.billing_cycle_months)
     return PaymentRead.model_validate(data)
 
 

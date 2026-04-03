@@ -13,7 +13,8 @@ class PaymentCreate(BaseModel):
     student_id: uuid.UUID | None = None
     student_code: str = Field(min_length=1, max_length=50)
     mode: PaymentMode
-    billing_start_month: date
+    billing_start_month: date | None = None
+    selected_months: list[date] = Field(default_factory=list)
     cycle_mode: PaymentCycle | None = None
     paid_at: datetime | None = None
     reference_no: str | None = Field(default=None, max_length=100)

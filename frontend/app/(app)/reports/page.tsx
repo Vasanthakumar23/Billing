@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Download, Filter } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Download, Filter, Search } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
 import { AppShell } from '@/components/app/shell';
@@ -12,137 +12,206 @@ import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { Table, TBody, TD, TH, THead } from '@/components/ui/table';
 import { apiFetch } from '@/lib/api';
+import { debounce } from '@/lib/debounce';
+
+type MonthlyStudent = {
+  student_id: string;
+  student_code: string;
+  name: string;
+  class_name: string | null;
+  section: string | null;
+  payment_period: string;
+  monthly_fee: string;
+  month: string;
+  month_label: string;
+  is_paid: boolean;
+  receipt_no?: string | null;
+};
+
+function toMonthDate(value: string) {
+  return `${value}-01`;
+}
+
+function monthLabel(value: string) {
+  const [year, month] = value.split('-').map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
 
 export default function ReportsPage() {
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [paymentState, setPaymentState] = useState<'paid' | 'unpaid' | 'all'>('unpaid');
+  const [search, setSearch] = useState('');
+  const [classCode, setClassCode] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [debouncedClassCode, setDebouncedClassCode] = useState('');
 
-  const pending = useQuery({
-    queryKey: ['pending'],
-    queryFn: () => apiFetch<any[]>('/reports/pending?status=active')
+  const setDebounced = useMemo(() => debounce((value: string) => setDebouncedSearch(value), 250), []);
+  const setDebouncedClass = useMemo(() => debounce((value: string) => setDebouncedClassCode(value), 250), []);
+  useEffect(() => {
+    setDebounced(search);
+  }, [search, setDebounced]);
+  useEffect(() => {
+    setDebouncedClass(classCode);
+  }, [classCode, setDebouncedClass]);
+
+  const students = useQuery({
+    queryKey: ['monthlyStudentReport', month, paymentState, debouncedSearch, debouncedClassCode],
+    queryFn: () =>
+      apiFetch<MonthlyStudent[]>(
+        `/reports/monthly-students?month=${encodeURIComponent(toMonthDate(month))}&payment_state=${paymentState}&search=${encodeURIComponent(
+          debouncedSearch
+        )}&class_code=${encodeURIComponent(debouncedClassCode)}`
+      )
   });
 
-  const daily = useQuery({
-    queryKey: ['daily', date],
-    queryFn: () => apiFetch<any[]>(`/reports/daily?date=${encodeURIComponent(date)}`)
-  });
+  const paidCount = students.data?.filter((item) => item.is_paid).length ?? 0;
+  const unpaidCount = students.data?.filter((item) => !item.is_paid).length ?? 0;
+  const exportHref = `/api/backend/export/monthly-students.csv?month=${encodeURIComponent(toMonthDate(month))}&payment_state=${encodeURIComponent(
+    paymentState
+  )}&search=${encodeURIComponent(debouncedSearch)}&class_code=${encodeURIComponent(debouncedClassCode)}`;
 
   return (
     <AppShell
       title="Reports & Analytics"
-      subtitle="Comprehensive collection insight across pending balances and daily payment channels."
+      subtitle="Track which students paid and which students are still unpaid for a selected month."
       action={
-        <Button onClick={() => window.location.assign('/api/backend/export/pending.csv')}>
+        <Button onClick={() => window.location.assign(exportHref)}>
           <Download className="h-4 w-4" />
-          Export Pending CSV
+          Export CSV
         </Button>
       }
     >
       <div className="page-grid">
         <Card>
           <CardHeader>
-            <CardTitle>Report Filters</CardTitle>
+            <CardTitle>Monthly Report Filters</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-[220px_220px_180px_minmax(0,1fr)_150px_150px]">
             <div className="rounded-2xl border border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
               <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-white">
                 <Filter className="h-4 w-4 text-[#4f7cff]" />
-                Collection Date
+                Month
               </div>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            </div>
-            <div className="rounded-2xl border border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
-              <div className="mb-2 text-sm font-semibold text-white">Pending Accounts</div>
-              <div className="text-3xl font-bold text-white">{pending.data?.length ?? '-'}</div>
-            </div>
-            <div className="rounded-2xl border border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
-              <div className="mb-2 text-sm font-semibold text-white">Daily Modes</div>
-              <div className="text-3xl font-bold text-white">{daily.data?.length ?? '-'}</div>
+              <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
             </div>
             <div className="rounded-2xl border border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
               <div className="mb-2 text-sm font-semibold text-white">Status</div>
-              <Badge className="bg-[rgba(79,124,255,0.16)] text-[#a7c1ff]">Live reporting</Badge>
+              <select
+                className="h-12 w-full rounded-2xl border border-[rgba(151,164,187,0.14)] bg-[rgba(255,255,255,0.04)] px-4 text-sm text-white outline-none"
+                value={paymentState}
+                onChange={(e) => setPaymentState(e.target.value as 'paid' | 'unpaid' | 'all')}
+              >
+                <option value="unpaid">Not Paid</option>
+                <option value="paid">Paid</option>
+                <option value="all">All</option>
+              </select>
+            </div>
+            <div className="rounded-2xl border border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
+              <div className="mb-2 text-sm font-semibold text-white">Class ID</div>
+              <Input
+                value={classCode}
+                onChange={(e) => setClassCode(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                placeholder="05"
+              />
+            </div>
+            <div className="rounded-2xl border border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
+              <div className="mb-2 text-sm font-semibold text-white">Search</div>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7484a1]" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Student name, roll no, class"
+                  className="pl-11"
+                />
+              </div>
+            </div>
+            <div className="rounded-2xl border border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
+              <div className="mb-2 text-sm font-semibold text-white">Paid</div>
+              <div className="text-3xl font-bold text-white">{paidCount}</div>
+            </div>
+            <div className="rounded-2xl border border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
+              <div className="mb-2 text-sm font-semibold text-white">Not Paid</div>
+              <div className="text-3xl font-bold text-white">{unpaidCount}</div>
             </div>
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 xl:grid-cols-[1.35fr_0.9fr]">
-          <Card>
-            <CardHeader>
-              <CardTitle>Pending Collections</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="max-h-[60vh] overflow-auto rounded-[24px] border border-[rgba(151,164,187,0.08)] bg-[rgba(255,255,255,0.02)]">
-                <Table>
-                  <THead>
-                    <tr>
-                      <TH>Student</TH>
-                      <TH>Monthly Fee</TH>
-                      <TH>Paid</TH>
-                      <TH>Pending</TH>
-                    </tr>
-                  </THead>
-                  <TBody>
-                    {pending.isLoading ? (
-                      <tr>
-                        <TD colSpan={4}>
-                          <div className="flex items-center gap-2 text-sm text-[#91a1bc]">
-                            <Spinner /> Loading
-                          </div>
-                        </TD>
-                      </tr>
-                    ) : pending.isError ? (
-                      <tr>
-                        <TD colSpan={4} className="text-sm text-rose-300">Failed to load</TD>
-                      </tr>
-                    ) : (
-                      pending.data?.map((r) => (
-                        <tr key={r.student_id}>
-                          <TD>
-                            <div className="font-semibold text-white">{r.name}</div>
-                            <div className="mt-1 text-sm text-[#91a1bc]">{r.student_code}</div>
-                          </TD>
-                          <TD>{r.expected_fee}</TD>
-                          <TD>{r.paid_total}</TD>
-                          <TD className="font-semibold text-white">{r.pending}</TD>
-                        </tr>
-                      ))
-                    )}
-                  </TBody>
-                </Table>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Student Month Status</CardTitle>
+              <div className="mt-1 text-sm text-[#91a1bc]">
+                Showing {paymentState === 'all' ? 'all students' : paymentState === 'paid' ? 'paid students' : 'students not paid'} for {monthLabel(month)}
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Daily Collection Snapshot</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {daily.isLoading ? (
-                <div className="flex items-center gap-2 text-sm text-[#91a1bc]">
-                  <Spinner /> Loading
-                </div>
-              ) : daily.isError ? (
-                <div className="text-sm text-rose-300">Failed to load</div>
-              ) : daily.data?.length ? (
-                daily.data.map((r) => (
-                  <div
-                    key={r.mode}
-                    className="flex items-center justify-between rounded-2xl border border-[rgba(151,164,187,0.1)] bg-[rgba(255,255,255,0.03)] px-4 py-4"
-                  >
-                    <div>
-                      <div className="font-semibold text-white">{String(r.mode).toUpperCase()}</div>
-                      <div className="mt-1 text-sm text-[#91a1bc]">Collected on {date}</div>
-                    </div>
-                    <div className="text-2xl font-bold text-white">{r.total}</div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-sm text-[#91a1bc]">No data for the selected date</div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+            <Badge className="bg-[rgba(79,124,255,0.16)] text-[#a7c1ff]">{monthLabel(month)}</Badge>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-auto rounded-[24px] border border-[rgba(151,164,187,0.08)] bg-[rgba(255,255,255,0.02)]">
+              <Table>
+                <THead>
+                  <tr>
+                    <TH>Student ID</TH>
+                    <TH>Name</TH>
+                    <TH>Class</TH>
+                    <TH>Period</TH>
+                    <TH>Monthly Fee</TH>
+                    <TH>Month</TH>
+                    <TH>Status</TH>
+                    <TH>Receipt</TH>
+                  </tr>
+                </THead>
+                <TBody>
+                  {students.isLoading ? (
+                    <tr>
+                      <TD colSpan={8}>
+                        <div className="flex items-center gap-2 text-sm text-[#91a1bc]">
+                          <Spinner /> Loading
+                        </div>
+                      </TD>
+                    </tr>
+                  ) : students.isError ? (
+                    <tr>
+                      <TD colSpan={8} className="text-sm text-rose-300">
+                        Failed to load monthly report
+                      </TD>
+                    </tr>
+                  ) : students.data?.length ? (
+                    students.data.map((student) => (
+                      <tr key={student.student_id}>
+                        <TD>{student.student_code}</TD>
+                        <TD className="font-semibold text-white">{student.name}</TD>
+                        <TD>{student.class_name ?? '-'}{student.section ? ` ${student.section}` : ''}</TD>
+                        <TD>{student.payment_period}</TD>
+                        <TD>{student.monthly_fee}</TD>
+                        <TD>{student.month_label}</TD>
+                        <TD>
+                          <Badge
+                            className={
+                              student.is_paid
+                                ? 'bg-[rgba(46,216,143,0.16)] text-[#48e69b]'
+                                : 'bg-[rgba(255,177,74,0.16)] text-[#ffbf6e]'
+                            }
+                          >
+                            {student.is_paid ? 'Paid' : 'Not Paid'}
+                          </Badge>
+                        </TD>
+                        <TD>{student.receipt_no ?? '-'}</TD>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <TD colSpan={8} className="text-sm text-[#91a1bc]">
+                        No students found for the selected filters
+                      </TD>
+                    </tr>
+                  )}
+                </TBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </AppShell>
   );

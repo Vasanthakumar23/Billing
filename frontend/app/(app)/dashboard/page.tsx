@@ -1,14 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowUpRight, Download, IndianRupee, Receipt, TrendingUp, Users } from 'lucide-react';
+import { ArrowUpRight, CheckCircle2, Download, UserX2, Users } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
 import { AppShell } from '@/components/app/shell';
 import { PaymentReceiptDialog } from '@/components/app/payment-receipt-dialog';
-import { StudentQuickSearch } from '@/components/app/student-quick-search';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { Table, TBody, TD, TH, THead } from '@/components/ui/table';
 import { apiFetch } from '@/lib/api';
@@ -18,26 +18,39 @@ type Summary = {
   today_total: string;
   month_total: string;
   pending_total: string;
+  paid_students: number;
+  unpaid_students: number;
+  active_students: number;
+  selected_month: string;
 };
 
 type Payment = {
   id: string;
   receipt_no: string;
   student_name?: string | null;
+  student_code?: string | null;
   fee_period_label?: string | null;
   amount: string;
   paid_at: string;
 };
 
-const trendBars = [68, 52, 84, 61, 78, 70];
+function toMonthDate(value: string) {
+  return `${value}-01`;
+}
+
+function monthLabel(value: string) {
+  const [year, month] = value.split('-').map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
 
 export default function DashboardPage() {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptPaymentId, setReceiptPaymentId] = useState<string | null>(null);
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
 
   const summary = useQuery({
-    queryKey: ['summary'],
-    queryFn: () => apiFetch<Summary>('/reports/summary')
+    queryKey: ['summary', month],
+    queryFn: () => apiFetch<Summary>(`/reports/summary?month=${encodeURIComponent(toMonthDate(month))}`)
   });
   const recentPayments = useQuery({
     queryKey: ['recentPayments'],
@@ -50,32 +63,11 @@ export default function DashboardPage() {
 
   const statCards = [
     {
-      label: 'Total Revenue',
-      value: summary.data?.total_collected,
-      caption: 'All recorded collections',
-      icon: IndianRupee,
-      tone: 'text-[#9cb4ff]'
-    },
-    {
       label: 'Total Students',
-      value: studentCount.data?.total?.toString() ?? '-',
-      caption: 'Active student records',
+      value: summary.data?.active_students?.toString() ?? studentCount.data?.total?.toString() ?? '-',
+      caption: 'Active students in selected month window',
       icon: Users,
       tone: 'text-[#8ce0ff]'
-    },
-    {
-      label: 'Paid This Month',
-      value: summary.data?.month_total,
-      caption: 'Current billing period inflow',
-      icon: TrendingUp,
-      tone: 'text-[#2ed88f]'
-    },
-    {
-      label: 'Pending Amount',
-      value: summary.data?.pending_total,
-      caption: 'Outstanding collections',
-      icon: Receipt,
-      tone: 'text-[#ffb14a]'
     }
   ];
 
@@ -84,10 +76,13 @@ export default function DashboardPage() {
       title="Dashboard"
       subtitle="Monitor collections, pending dues, and the latest payment activity across your institution."
       action={
-        <Button onClick={() => window.location.assign('/api/backend/export/pending.csv')}>
-          <Download className="h-4 w-4" />
-          Export Report
-        </Button>
+        <div className="flex flex-wrap gap-3">
+          <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-[180px]" />
+          <Button onClick={() => window.location.assign('/api/backend/export/pending.csv')}>
+            <Download className="h-4 w-4" />
+            Export Report
+          </Button>
+        </div>
       }
     >
       {summary.isLoading ? (
@@ -98,7 +93,7 @@ export default function DashboardPage() {
         <div className="text-sm text-rose-300">Failed to load summary</div>
       ) : (
         <div className="page-grid">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {statCards.map((item) => {
               const Icon = item.icon;
               return (
@@ -121,27 +116,40 @@ export default function DashboardPage() {
                 </Card>
               );
             })}
-          </div>
-
-          <div className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
-            <Card>
-              <CardHeader>
-                <CardTitle>Monthly Collection Trend</CardTitle>
-                <div className="text-sm text-[#91a1bc]">Revenue momentum across recent collection cycles</div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid h-[280px] grid-cols-6 items-end gap-4 rounded-[24px] border border-[rgba(151,164,187,0.08)] bg-[rgba(255,255,255,0.02)] p-6">
-                  {trendBars.map((bar, index) => (
-                    <div key={index} className="flex h-full flex-col justify-end gap-3">
-                      <div className="rounded-t-[18px] bg-[linear-gradient(180deg,rgba(79,124,255,0.98)_0%,rgba(79,124,255,0.22)_100%)]" style={{ height: `${bar}%` }} />
-                      <div className="text-center text-sm text-[#8ea0bf]">{['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'][index]}</div>
-                    </div>
-                  ))}
+            <Card className="metric-card">
+              <CardContent className="space-y-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-medium text-[#9aa8c2]">Students Paid</div>
+                    <div className="mt-4 text-4xl font-bold text-white">{summary.data?.paid_students ?? '-'}</div>
+                  </div>
+                  <div className="rounded-2xl border border-[rgba(46,216,143,0.16)] bg-[rgba(46,216,143,0.12)] p-3">
+                    <CheckCircle2 className="h-6 w-6 text-[#2ed88f]" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-[#8ea0bf]">
+                  <ArrowUpRight className="h-4 w-4 text-[#2ed88f]" />
+                  Students paid for {monthLabel(month)}
                 </div>
               </CardContent>
             </Card>
-
-            <StudentQuickSearch />
+            <Card className="metric-card">
+              <CardContent className="space-y-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-medium text-[#9aa8c2]">Students Not Paid</div>
+                    <div className="mt-4 text-4xl font-bold text-white">{summary.data?.unpaid_students ?? '-'}</div>
+                  </div>
+                  <div className="rounded-2xl border border-[rgba(255,177,74,0.16)] bg-[rgba(255,177,74,0.12)] p-3">
+                    <UserX2 className="h-6 w-6 text-[#ffb14a]" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-[#8ea0bf]">
+                  <ArrowUpRight className="h-4 w-4 text-[#ffb14a]" />
+                  Students pending for {monthLabel(month)}
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           <Card>
@@ -166,10 +174,10 @@ export default function DashboardPage() {
                   <Table>
                     <THead>
                       <tr>
+                        <TH>Student ID</TH>
                         <TH>Student</TH>
                         <TH>Receipt</TH>
                         <TH>Fee Period</TH>
-                        <TH>Amount</TH>
                         <TH>Date</TH>
                         <TH></TH>
                       </tr>
@@ -177,10 +185,10 @@ export default function DashboardPage() {
                     <TBody>
                       {recentPayments.data?.items.map((payment) => (
                         <tr key={payment.id}>
+                          <TD>{payment.student_code ?? '-'}</TD>
                           <TD className="font-semibold text-white">{payment.student_name ?? '-'}</TD>
                           <TD>{payment.receipt_no}</TD>
                           <TD>{payment.fee_period_label ?? '-'}</TD>
-                          <TD className="font-semibold text-white">{payment.amount}</TD>
                           <TD>{new Date(payment.paid_at).toLocaleString()}</TD>
                           <TD>
                             <Button

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query
@@ -12,10 +12,12 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.models.enums import StudentStatus
 from app.models.payment import Payment
 from app.models.student import Student
 from app.models.user import User
 from app.services.billing import fee_period_label, get_student_billing_overview, pending_amount
+from app.services.billing import normalize_month
 
 
 router = APIRouter()
@@ -142,3 +144,53 @@ def export_pending_csv(
         ],
     ]
     return _csv_response("pending.csv", rows)
+
+
+@router.get("/monthly-students.csv")
+def export_monthly_students_csv(
+    month: date = Query(...),
+    payment_state: str = Query("unpaid", pattern="^(paid|unpaid|all)$"),
+    search: str | None = None,
+    class_code: str | None = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> Response:
+    selected_month = normalize_month(month)
+    stmt = select(Student).where(Student.status == StudentStatus.active).order_by(Student.student_code)
+    if search:
+        s = f"%{search.lower()}%"
+        stmt = stmt.where(
+            func.lower(Student.student_code).like(s) | func.lower(Student.name).like(s) | func.lower(Student.class_name).like(s)
+        )
+    if class_code:
+        stmt = stmt.where(Student.student_code.like(f"{class_code.strip()}%"))
+    students = db.execute(stmt).scalars().all()
+    rows_data: list[list[str]] = []
+    for student in students:
+        overview = get_student_billing_overview(db, student)
+        target_month = next((item for item in overview.months if item["month"] == selected_month), None)
+        if target_month is None:
+            continue
+        is_paid = bool(target_month["is_paid"])
+        if payment_state == "paid" and not is_paid:
+            continue
+        if payment_state == "unpaid" and is_paid:
+            continue
+        rows_data.append(
+            [
+                student.student_code,
+                student.name,
+                student.class_name or "",
+                student.section or "",
+                overview.cycle_label,
+                str(overview.monthly_fee),
+                target_month["label"],
+                "paid" if is_paid else "unpaid",
+                target_month["receipt_no"] or "",
+            ]
+        )
+    rows = [
+        ["student_code", "name", "class_name", "section", "payment_period", "monthly_fee", "month", "status", "receipt_no"],
+        *rows_data,
+    ]
+    return _csv_response(f"students_{payment_state}_{selected_month.isoformat()}.csv", rows)

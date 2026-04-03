@@ -52,9 +52,13 @@ type BillingMonth = {
 
 type BillingOverview = {
   monthly_fee: string;
-  cycle_mode: string;
+  cycle_label: string;
   cycle_months: number;
   payable_amount: string;
+  batch?: string | null;
+  batch_start_month: number;
+  batch_start_label: string;
+  batch_end_label: string;
   next_unpaid_label: string;
   pending_months: BillingMonth[];
 };
@@ -202,7 +206,10 @@ export default function StudentDetailPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="text-sm text-[#91a1bc]">
-                Current cycle: {overview.data?.cycle_mode?.replaceAll('_', ' ')} ({overview.data?.cycle_months ?? 0} months)
+                Current period: {overview.data?.cycle_label} ({overview.data?.cycle_months ?? 0} months)
+              </div>
+              <div className="text-sm text-[#91a1bc]">
+                Batch window: {overview.data?.batch_start_label} - {overview.data?.batch_end_label}
               </div>
               <div className="flex flex-wrap gap-2">
                 {overview.data?.pending_months.length ? (

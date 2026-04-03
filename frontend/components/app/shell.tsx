@@ -4,6 +4,7 @@ import {
   Banknote,
   BarChart3,
   CreditCard,
+  HandCoins,
   LayoutDashboard,
   LogOut,
   Moon,
@@ -23,6 +24,7 @@ const nav = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/students', label: 'Students', icon: UsersRound },
   { href: '/collect', label: 'Collect', icon: Banknote },
+  { href: '/expenses', label: 'Expenses', icon: HandCoins },
   { href: '/transactions', label: 'Transactions', icon: ReceiptText },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/settings', label: 'Settings', icon: Settings }

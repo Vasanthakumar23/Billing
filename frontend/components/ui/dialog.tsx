@@ -9,13 +9,15 @@ export function Dialog({ open, onOpenChange, children }: { open: boolean; onOpen
   return (
     <div className="fixed inset-0 z-40" aria-modal="true" role="dialog">
       <div className="absolute inset-0 bg-[rgba(3,6,11,0.72)] backdrop-blur-sm" onClick={() => onOpenChange(false)} />
-      <div className="absolute inset-0 flex items-center justify-center p-4">{children}</div>
+      <div className="absolute inset-0 overflow-y-auto p-4">
+        <div className="flex min-h-full items-start justify-center py-6">{children}</div>
+      </div>
     </div>
   );
 }
 
 export function DialogContent({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cn('glass-panel w-full max-w-xl rounded-[28px]', className)}>{children}</div>;
+  return <div className={cn('glass-panel my-auto w-full max-w-xl rounded-[28px]', className)}>{children}</div>;
 }
 
 export function DialogHeader({ className, children }: { className?: string; children: ReactNode }) {

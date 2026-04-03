@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Download, Plus, Search } from 'lucide-react';
+import { Download, Eye, Plus, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -30,6 +30,9 @@ type StudentListItem = {
   expected_fee: string;
   paid_total: string;
   pending: string;
+  last_paid_label: string | null;
+  next_due_label: string | null;
+  next_due_state: 'pending' | 'upcoming' | null;
 };
 
 type ListResp = { items: StudentListItem[]; total: number };
@@ -45,7 +48,9 @@ type CreateValues = z.infer<typeof createSchema>;
 
 export default function StudentsPage() {
   const [search, setSearch] = useState('');
+  const [classCode, setClassCode] = useState('');
   const [debounced, setDebounced] = useState('');
+  const [debouncedClassCode, setDebouncedClassCode] = useState('');
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<'all' | 'active' | 'inactive'>('active');
   const [createOpen, setCreateOpen] = useState(false);
@@ -58,13 +63,17 @@ export default function StudentsPage() {
   });
 
   const setDebouncedFn = useMemo(() => debounce((v: string) => setDebounced(v), 250), []);
+  const setDebouncedClassFn = useMemo(() => debounce((v: string) => setDebouncedClassCode(v), 250), []);
   useEffect(() => setDebouncedFn(search), [search, setDebouncedFn]);
+  useEffect(() => setDebouncedClassFn(classCode), [classCode, setDebouncedClassFn]);
 
   const query = useQuery({
-    queryKey: ['students', debounced, page, status],
+    queryKey: ['students', debounced, debouncedClassCode, page, status],
     queryFn: () =>
       apiFetch<ListResp>(
-        `/students/balances?search=${encodeURIComponent(debounced)}&status=${status === 'all' ? '' : status}&page=${page}&page_size=25`
+        `/students/balances?search=${encodeURIComponent(debounced)}&class_code=${encodeURIComponent(
+          debouncedClassCode
+        )}&status=${status === 'all' ? '' : status}&page=${page}&page_size=25`
       )
   });
 
@@ -101,16 +110,25 @@ export default function StudentsPage() {
       <div className="page-grid">
         <Card>
           <CardContent className="space-y-5">
-            <div className="grid gap-4 lg:grid-cols-[1fr_160px]">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_160px]">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7484a1]" />
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search by roll number or student name"
+                  placeholder="Search by student name or roll number"
                   className="pl-11"
                 />
               </div>
+              <Input
+                value={classCode}
+                onChange={(e) => {
+                  const next = e.target.value.replace(/\D/g, '').slice(0, 2);
+                  setClassCode(next);
+                  setPage(1);
+                }}
+                placeholder="Class code, e.g. 05"
+              />
               <select
                 className="h-12 rounded-2xl border border-[rgba(151,164,187,0.14)] bg-[rgba(255,255,255,0.04)] px-4 text-sm text-white outline-none"
                 value={status}
@@ -123,6 +141,9 @@ export default function StudentsPage() {
                 <option value="inactive">Inactive</option>
                 <option value="all">All</option>
               </select>
+            </div>
+            <div className="text-xs text-[#91a1bc]">
+              Use the class filter for roll numbers where the first two digits represent the class, for example <span className="text-white">05xx</span>.
             </div>
             <div className="text-sm text-[#91a1bc]">
               Showing <span className="font-semibold text-white">{query.data?.total ?? 0}</span> student records
@@ -139,16 +160,17 @@ export default function StudentsPage() {
                     <TH>Student</TH>
                     <TH>Class</TH>
                     <TH>Monthly Fee</TH>
-                    <TH>Paid</TH>
+                    <TH>Last Paid</TH>
+                    <TH>Next Due</TH>
                     <TH>Pending</TH>
                     <TH>Status</TH>
-                    <TH></TH>
+                    <TH>Profile</TH>
                   </tr>
                 </THead>
                 <TBody>
                   {query.isLoading ? (
                     <tr>
-                      <TD colSpan={7}>
+                      <TD colSpan={8}>
                         <div className="flex items-center gap-2 text-sm text-[#91a1bc]">
                           <Spinner /> Loading
                         </div>
@@ -156,7 +178,7 @@ export default function StudentsPage() {
                     </tr>
                   ) : query.isError ? (
                     <tr>
-                      <TD colSpan={7} className="text-sm text-rose-300">
+                      <TD colSpan={8} className="text-sm text-rose-300">
                         Failed to load students
                       </TD>
                     </tr>
@@ -169,7 +191,24 @@ export default function StudentsPage() {
                         </TD>
                         <TD>{s.class_name ?? '-'} {s.section ?? ''}</TD>
                         <TD>{s.expected_fee}</TD>
-                        <TD>{s.paid_total}</TD>
+                        <TD>
+                          <div className="text-sm font-medium text-white">{s.last_paid_label ?? '-'}</div>
+                        </TD>
+                        <TD>
+                          {s.next_due_label ? (
+                            <div
+                              className={
+                                s.next_due_state === 'pending'
+                                  ? 'inline-flex rounded-full bg-[rgba(245,158,11,0.14)] px-3 py-1 text-sm font-medium text-amber-200'
+                                  : 'inline-flex rounded-full bg-[rgba(96,122,255,0.14)] px-3 py-1 text-sm font-medium text-[#c8d7ff]'
+                              }
+                            >
+                              {s.next_due_label}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-[#91a1bc]">Fully paid</span>
+                          )}
+                        </TD>
                         <TD className={Number(s.pending) > 0 ? 'font-semibold text-white' : ''}>{s.pending}</TD>
                         <TD>
                           <Badge className={s.status === 'active' ? 'bg-[rgba(46,216,143,0.16)] text-[#48e69b]' : 'bg-[rgba(151,164,187,0.08)] text-[#9aa8c2]'}>
@@ -177,15 +216,20 @@ export default function StudentsPage() {
                           </Badge>
                         </TD>
                         <TD>
-                          <Link href={`/students/${s.id}`} className="font-semibold text-[#a7c1ff] transition-colors hover:text-white">
-                            View profile
+                          <Link
+                            href={`/students/${s.id}`}
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(96,122,255,0.2)] bg-[rgba(96,122,255,0.12)] text-[#c8d7ff] transition-colors hover:bg-[rgba(96,122,255,0.2)] hover:text-white"
+                            aria-label={`View profile for ${s.name}`}
+                            title={`View profile for ${s.name}`}
+                          >
+                            <Eye className="h-4 w-4" />
                           </Link>
                         </TD>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <TD colSpan={7} className="text-sm text-[#91a1bc]">
+                      <TD colSpan={8} className="text-sm text-[#91a1bc]">
                         No students found
                       </TD>
                     </tr>
