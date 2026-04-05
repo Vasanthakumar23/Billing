@@ -82,22 +82,19 @@ export default function ReportsPage() {
       }
     >
       <div className="page-grid">
-        <Card>
-          <CardHeader>
-            <CardTitle>Monthly Report Filters</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-[220px_220px_180px_minmax(0,1fr)_150px_150px]">
-            <div className="theme-subtle-surface rounded-2xl px-4 py-3">
-              <div className="theme-heading mb-2 flex items-center gap-2 text-sm font-semibold">
-                <Filter className="h-4 w-4 text-[#4f7cff]" />
+        <div className="space-y-3">
+          <div className="grid gap-3 xl:grid-cols-[180px_180px_160px_minmax(0,1fr)_120px_120px]">
+            <div className="space-y-1.5">
+              <div className="theme-heading flex items-center gap-2 text-sm font-medium">
+                <Filter className="h-4 w-4 text-[var(--accent)]" />
                 Month
               </div>
-              <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+              <Input className="h-10 rounded-xl" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
             </div>
-            <div className="theme-subtle-surface rounded-2xl px-4 py-3">
-              <div className="theme-heading mb-2 text-sm font-semibold">Status</div>
+            <div className="space-y-1.5">
+              <div className="theme-heading text-sm font-medium">Status</div>
               <select
-                className="theme-select h-12 w-full rounded-2xl px-4 text-sm outline-none"
+                className="theme-select h-10 w-full rounded-xl px-4 text-sm outline-none"
                 value={paymentState}
                 onChange={(e) => setPaymentState(e.target.value as 'paid' | 'unpaid' | 'all')}
               >
@@ -106,38 +103,39 @@ export default function ReportsPage() {
                 <option value="all">All</option>
               </select>
             </div>
-            <div className="theme-subtle-surface rounded-2xl px-4 py-3">
-              <div className="theme-heading mb-2 text-sm font-semibold">Class ID</div>
+            <div className="space-y-1.5">
+              <div className="theme-heading text-sm font-medium">Class ID</div>
               <Input
+                className="h-10 rounded-xl"
                 value={classCode}
                 onChange={(e) => setClassCode(e.target.value.replace(/\D/g, '').slice(0, 2))}
                 placeholder="05"
               />
             </div>
-            <div className="theme-subtle-surface rounded-2xl px-4 py-3">
-              <div className="theme-heading mb-2 text-sm font-semibold">Search</div>
+            <div className="space-y-1.5">
+              <div className="theme-heading text-sm font-medium">Search</div>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7484a1]" />
                 <Input
+                  className="h-10 rounded-xl pl-11"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Student name, roll no, class"
-                  className="pl-11"
                 />
               </div>
             </div>
-            <div className="theme-subtle-surface rounded-2xl px-4 py-3">
-              <div className="theme-heading mb-2 text-sm font-semibold">Paid</div>
-              <div className="theme-heading text-3xl font-bold">{paidCount}</div>
+            <div className="theme-subtle-surface rounded-[18px] px-3 py-2.5">
+              <div className="text-xs uppercase tracking-[0.12em] text-[#7484a1]">Paid</div>
+              <div className="theme-heading mt-1 text-2xl font-semibold">{paidCount}</div>
             </div>
-            <div className="theme-subtle-surface rounded-2xl px-4 py-3">
-              <div className="theme-heading mb-2 text-sm font-semibold">Not Paid</div>
-              <div className="theme-heading text-3xl font-bold">{unpaidCount}</div>
+            <div className="theme-subtle-surface rounded-[18px] px-3 py-2.5">
+              <div className="text-xs uppercase tracking-[0.12em] text-[#7484a1]">Not Paid</div>
+              <div className="theme-heading mt-1 text-2xl font-semibold">{unpaidCount}</div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card>
+        <Card className="shadow-none">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Student Month Status</CardTitle>
@@ -148,7 +146,7 @@ export default function ReportsPage() {
             <Badge className="theme-chip-neutral">{monthLabel(month)}</Badge>
           </CardHeader>
           <CardContent>
-            <div className="theme-table-wrap overflow-auto rounded-[24px]">
+            <div className="overflow-auto">
               <Table>
                 <THead>
                   <tr>
@@ -164,7 +162,7 @@ export default function ReportsPage() {
                 </THead>
                 <TBody>
                   {students.isLoading ? (
-                    <tr>
+                    <tr className="bg-[var(--panel)]">
                       <TD colSpan={8}>
                         <div className="flex items-center gap-2 text-sm text-[#91a1bc]">
                           <Spinner /> Loading
@@ -172,14 +170,14 @@ export default function ReportsPage() {
                       </TD>
                     </tr>
                   ) : students.isError ? (
-                    <tr>
+                    <tr className="bg-[var(--panel)]">
                       <TD colSpan={8} className="text-sm text-rose-300">
                         Failed to load monthly report
                       </TD>
                     </tr>
                   ) : students.data?.length ? (
                     students.data.map((student) => (
-                      <tr key={student.student_id}>
+                      <tr key={student.student_id} className="bg-[var(--panel)]">
                         <TD>{student.student_code}</TD>
                         <TD className="theme-heading font-semibold">{student.name}</TD>
                         <TD>{student.class_name ?? '-'}{student.section ? ` ${student.section}` : ''}</TD>
@@ -201,7 +199,7 @@ export default function ReportsPage() {
                       </tr>
                     ))
                   ) : (
-                    <tr>
+                    <tr className="bg-[var(--panel)]">
                       <TD colSpan={8} className="text-sm text-[#91a1bc]">
                         No students found for the selected filters
                       </TD>

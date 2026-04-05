@@ -117,7 +117,11 @@ export function AppShell({
           <div className="mb-7 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <h1 className="theme-heading text-3xl font-semibold tracking-[-0.03em] sm:text-4xl">{title}</h1>
-              {subtitle ? <p className="mt-3 max-w-2xl text-base text-[#91a1bc]">{subtitle}</p> : null}
+              {subtitle ? (
+                <p className="mt-3 max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-base text-[#91a1bc]">
+                  {subtitle}
+                </p>
+              ) : null}
             </div>
             {action ? <div className="shrink-0">{action}</div> : null}
           </div>

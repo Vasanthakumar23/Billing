@@ -53,7 +53,6 @@ const schema = z.object({
   student_code: z.string().min(1, 'Roll number is required'),
   billing_start_month: z.string().optional(),
   mode: z.enum(['cash', 'upi', 'bank']),
-  reference_no: z.string().optional(),
   notes: z.string().optional()
 });
 type FormValues = z.infer<typeof schema>;
@@ -76,7 +75,6 @@ export default function CollectPage() {
       student_code: rollNoFromQuery,
       billing_start_month: '',
       mode: 'cash',
-      reference_no: '',
       notes: ''
     }
   });
@@ -219,12 +217,12 @@ export default function CollectPage() {
           />
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.15fr_0.85fr]">
           <Card>
             <CardHeader>
               <CardTitle>Student Billing</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3">
               {studentCodeLookup ? (
                 isStudentLoading || overview.isLoading ? (
                   <div className="flex items-center gap-2 text-sm text-[#91a1bc]">
@@ -234,33 +232,31 @@ export default function CollectPage() {
                   <div className="text-sm text-rose-300">Failed to load student billing data</div>
                 ) : (
                   <>
-                    <div className="theme-subtle-surface flex items-center justify-between gap-3 rounded-[24px] p-4">
-                      <div>
-                        <div className="theme-heading font-semibold">
+                    <div className="theme-subtle-surface flex items-center justify-between gap-3 rounded-[20px] p-3">
+                      <div className="min-w-0">
+                        <div className="theme-heading truncate text-[1.05rem] font-semibold">
                           {selectedStudent?.name} ({selectedStudent?.student_code})
                         </div>
-                        <div className="text-sm text-[#91a1bc]">Roll number confirms which student this payment belongs to</div>
                       </div>
                       <Badge className={selectedStudent?.status === 'active' ? 'theme-chip-success' : 'theme-chip-neutral'}>
                         {selectedStudent?.status}
                       </Badge>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                      <div className="theme-subtle-surface rounded-[24px] p-4">
+                    <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-3">
+                      <div className="theme-subtle-surface rounded-[18px] px-3 py-2.5">
                         <div className="text-xs text-[#7484a1]">Monthly Fee</div>
-                        <div className="theme-heading mt-2 font-semibold">{overview.data?.monthly_fee}</div>
+                        <div className="theme-heading mt-1 whitespace-nowrap text-[1.05rem] font-semibold">{overview.data?.monthly_fee}</div>
                       </div>
-                      <div className="theme-subtle-surface rounded-[24px] p-4">
+                      <div className="theme-subtle-surface rounded-[18px] px-3 py-2.5">
                         <div className="text-xs text-[#7484a1]">Payable Now</div>
-                        <div className="theme-heading mt-2 font-semibold">{payableAmount}</div>
+                        <div className="theme-heading mt-1 whitespace-nowrap text-[1.05rem] font-semibold">{payableAmount}</div>
+                      </div>
+                      <div className="theme-subtle-surface rounded-[18px] px-3 py-2.5">
+                        <div className="text-xs text-[#7484a1]">Next Month Due</div>
+                        <div className="theme-heading mt-1 whitespace-nowrap text-[1.05rem] font-semibold">{overview.data?.next_unpaid_label}</div>
                       </div>
                     </div>
-
-                    <div className="theme-subtle-surface rounded-[24px] p-4">
-                        <div className="text-xs text-[#7484a1]">Next unpaid month</div>
-                        <div className="theme-heading mt-2 font-semibold">{overview.data?.next_unpaid_label}</div>
-                      </div>
 
                     <div>
                       <div className="theme-heading mb-2 text-sm font-medium">Month status</div>
@@ -268,7 +264,7 @@ export default function CollectPage() {
                         {overview.data?.months.map((month) => (
                           <div
                             key={month.month}
-                            className={`rounded-md border p-2 text-sm ${
+                            className={`rounded-md border px-2.5 py-2 text-sm ${
                               month.is_paid
                                 ? 'theme-chip-success border-transparent'
                                 : 'theme-subtle-surface text-[var(--heading)]'
@@ -304,10 +300,12 @@ export default function CollectPage() {
                       value={form.watch('student_code')}
                       onChange={(e) => form.setValue('student_code', e.target.value)}
                       placeholder="S001"
+                      className="h-10 rounded-xl"
                     />
                     <Button
                       type="button"
                       variant="outline"
+                      className="h-10 rounded-xl px-4"
                       onClick={() => setStudentCodeLookup(form.getValues('student_code').trim())}
                     >
                       Load
@@ -329,7 +327,7 @@ export default function CollectPage() {
                                   key={month.month}
                                   type="button"
                                   onClick={() => toggleMonth(month.month)}
-                                  className={`min-w-[120px] rounded-2xl border px-3 py-3 text-left text-sm transition-colors ${
+                                  className={`min-w-[108px] rounded-xl border px-3 py-2.5 text-left text-sm transition-colors ${
                                     active
                                       ? 'theme-chip-warn border-[rgba(183,121,31,0.22)] text-[var(--heading)]'
                                       : 'theme-chip-warn border-[rgba(183,121,31,0.14)]'
@@ -357,7 +355,7 @@ export default function CollectPage() {
                                   key={month.month}
                                   type="button"
                                   onClick={() => toggleMonth(month.month)}
-                                  className={`min-w-[120px] rounded-2xl border px-3 py-3 text-left text-sm transition-colors ${
+                                  className={`min-w-[108px] rounded-xl border px-3 py-2.5 text-left text-sm transition-colors ${
                                     active
                                       ? 'border-[rgba(47,111,237,0.24)] bg-[var(--accent-soft)] text-[var(--heading)]'
                                       : 'theme-subtle-surface text-[var(--muted)]'
@@ -386,7 +384,7 @@ export default function CollectPage() {
                 <div>
                   <div className="theme-heading mb-2 text-sm font-medium">Mode</div>
                   <select
-                    className="theme-select h-12 w-full rounded-2xl px-4 text-sm outline-none"
+                    className="theme-select h-10 w-full rounded-xl px-4 text-sm outline-none"
                     {...form.register('mode')}
                   >
                     <option value="cash">Cash</option>
@@ -395,14 +393,10 @@ export default function CollectPage() {
                   </select>
                 </div>
                 <div>
-                  <div className="theme-heading mb-2 text-sm font-medium">Reference</div>
-                  <Input {...form.register('reference_no')} />
+                  <div className="theme-heading mb-2 text-sm font-medium">Remarks</div>
+                  <Input className="h-10 rounded-xl" {...form.register('notes')} />
                 </div>
-                <div>
-                  <div className="theme-heading mb-2 text-sm font-medium">Notes</div>
-                  <Input {...form.register('notes')} />
-                </div>
-                <Button type="submit" disabled={createPayment.isPending || !selectedStudent?.id || selectedMonths.length === 0}>
+                <Button className="h-10 rounded-xl px-4" type="submit" disabled={createPayment.isPending || !selectedStudent?.id || selectedMonths.length === 0}>
                   {createPayment.isPending ? <Spinner className="mr-2" /> : null}
                   Pay {payableAmount}
                 </Button>

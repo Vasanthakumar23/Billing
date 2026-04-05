@@ -63,12 +63,6 @@ export function Receipt({ data, onClose }: { data: ReceiptData; onClose: () => v
               <div className="font-semibold text-white">{data.reference_no ?? data.notes}</div>
             </div>
           ) : null}
-          {data.notes ? (
-            <div className="text-sm">
-              <div className="text-[#91a1bc]">Notes</div>
-              <div className="font-semibold text-white">{data.notes}</div>
-            </div>
-          ) : null}
         </CardContent>
       </Card>
 

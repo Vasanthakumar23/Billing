@@ -6,7 +6,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { AppShell } from '@/components/app/shell';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { Table, TBody, TD, TH, THead } from '@/components/ui/table';
@@ -59,6 +60,7 @@ export default function ExpensesPage() {
   const qc = useQueryClient();
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [items, setItems] = useState<EditableExpense[]>(() => [createEmptyExpense()]);
+  const [editorOpen, setEditorOpen] = useState(false);
 
   const expenseMonth = useMemo(() => toMonthDate(month), [month]);
   const monthly = useQuery({
@@ -99,6 +101,7 @@ export default function ExpensesPage() {
       }),
     onSuccess: (data) => {
       toast({ title: 'Expenses saved', description: `${data.items.length} expense rows recorded for ${data.month_label}` });
+      setEditorOpen(false);
       qc.invalidateQueries({ queryKey: ['expensesMonthly', expenseMonth] });
     },
     onError: (e) => toast({ title: 'Save failed', description: String(e) })
@@ -123,107 +126,43 @@ export default function ExpensesPage() {
       title="Expenses"
       subtitle="Track monthly expenses with flexible line items and compare them against collected fee income."
       action={
-        <div className="flex gap-3">
-          <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-[180px]" />
-          <Button onClick={addRow}>
-            <Plus className="h-4 w-4" />
-            Add Expense Row
-          </Button>
-        </div>
+        <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-10 w-[180px] rounded-xl" />
       }
     >
       <div className="page-grid">
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle>Income</CardTitle>
-            </CardHeader>
-            <CardContent className="text-3xl font-bold text-white">
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="theme-subtle-surface rounded-[20px] px-4 py-3">
+            <div className="text-xs uppercase tracking-[0.14em] text-[#7484a1]">Income</div>
+            <div className="theme-heading mt-1 text-2xl font-semibold">
               {monthly.isLoading ? <Spinner /> : monthly.data?.income_total ?? '0'}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Expenses</CardTitle>
-            </CardHeader>
-            <CardContent className="text-3xl font-bold text-white">
+            </div>
+          </div>
+          <div className="theme-subtle-surface rounded-[20px] px-4 py-3">
+            <div className="text-xs uppercase tracking-[0.14em] text-[#7484a1]">Expenses</div>
+            <div className="theme-heading mt-1 text-2xl font-semibold">
               {monthly.isLoading ? <Spinner /> : monthly.data?.expense_total ?? '0'}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Net</CardTitle>
-            </CardHeader>
-            <CardContent className={`text-3xl font-bold ${Number(monthly.data?.net_total ?? 0) < 0 ? 'text-rose-300' : 'text-white'}`}>
+            </div>
+          </div>
+          <div className="theme-subtle-surface rounded-[20px] px-4 py-3">
+            <div className="text-xs uppercase tracking-[0.14em] text-[#7484a1]">Net</div>
+            <div className={`mt-1 text-2xl font-semibold ${Number(monthly.data?.net_total ?? 0) < 0 ? 'text-rose-300' : 'theme-heading'}`}>
               {monthly.isLoading ? <Spinner /> : monthly.data?.net_total ?? '0'}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Add Expenses</CardTitle>
-              <div className="mt-1 text-sm text-[#91a1bc]">
-                Add the expense name and value for this month. Examples: Rent, EB Bill, Salary, Internet.
+        <Card className="mt-2 shadow-none">
+          <CardContent className="space-y-3 p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="theme-heading text-lg font-semibold">Saved Expense Rows</div>
+                <div className="mt-1 text-sm text-[#91a1bc]">Review the saved expenses for the selected month.</div>
               </div>
+              <Button className="h-10 rounded-xl" onClick={() => setEditorOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Edit Expenses
+              </Button>
             </div>
-            <Button onClick={() => saveExpenses.mutate()} disabled={saveExpenses.isPending}>
-              {saveExpenses.isPending ? <Spinner className="mr-2" /> : <Save className="h-4 w-4" />}
-              Save Expenses
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="overflow-auto rounded-[24px] border border-[rgba(151,164,187,0.08)] bg-[rgba(255,255,255,0.02)]">
-                <Table>
-                  <THead>
-                    <tr>
-                      <TH>Expense Name</TH>
-                      <TH>Value</TH>
-                      <TH>Notes</TH>
-                      <TH></TH>
-                    </tr>
-                  </THead>
-                  <TBody>
-                    {items.map((item, index) => (
-                      <tr key={index}>
-                      <TD>
-                        <Input value={item.title} onChange={(e) => updateRow(index, { title: e.target.value })} placeholder="Rent" />
-                      </TD>
-                      <TD>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={item.amount}
-                          onChange={(e) => updateRow(index, { amount: e.target.value })}
-                          placeholder="0.00"
-                        />
-                      </TD>
-                      <TD>
-                        <Input value={item.notes} onChange={(e) => updateRow(index, { notes: e.target.value })} placeholder="Optional note" />
-                      </TD>
-                      <TD>
-                        <Button type="button" variant="outline" size="sm" onClick={() => removeRow(index)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TD>
-                      </tr>
-                    ))}
-                  </TBody>
-                </Table>
-            </div>
-            <div className="text-sm text-[#91a1bc]">
-              Draft expense total for this editor: <span className="font-semibold text-white">{totalDraftExpense.toFixed(2)}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Saved Expense Rows</CardTitle>
-          </CardHeader>
-          <CardContent>
             {monthly.isLoading ? (
               <div className="flex items-center gap-2 text-sm text-[#91a1bc]">
                 <Spinner /> Loading
@@ -231,7 +170,7 @@ export default function ExpensesPage() {
             ) : monthly.isError ? (
               <div className="text-sm text-rose-300">Failed to load expenses</div>
             ) : monthly.data?.items.length ? (
-              <div className="overflow-auto rounded-[24px] border border-[rgba(151,164,187,0.08)] bg-[rgba(255,255,255,0.02)]">
+              <div className="overflow-auto">
                 <Table>
                   <THead>
                     <tr>
@@ -243,9 +182,9 @@ export default function ExpensesPage() {
                   </THead>
                   <TBody>
                     {monthly.data.items.map((item) => (
-                      <tr key={item.id}>
+                      <tr key={item.id} className="bg-[var(--panel)]">
                         <TD>{formatSavedDate(item.created_at)}</TD>
-                        <TD className="font-semibold text-white">{item.title}</TD>
+                        <TD className="theme-heading font-semibold">{item.title}</TD>
                         <TD>{item.amount}</TD>
                         <TD>{item.notes ?? '-'}</TD>
                       </tr>
@@ -259,6 +198,77 @@ export default function ExpensesPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Edit Expenses</DialogTitle>
+          </DialogHeader>
+          <DialogBody className="space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="text-sm text-[#91a1bc]">
+                Add the expense name and value for this month. Examples: Rent, EB Bill, Salary, Internet.
+              </div>
+              <Button variant="outline" className="h-10 rounded-xl" onClick={addRow}>
+                <Plus className="h-4 w-4" />
+                Add Expense Row
+              </Button>
+            </div>
+            <div className="overflow-auto">
+              <Table>
+                <THead>
+                  <tr>
+                    <TH>Expense Name</TH>
+                    <TH>Value</TH>
+                    <TH>Notes</TH>
+                    <TH></TH>
+                  </tr>
+                </THead>
+                <TBody>
+                  {items.map((item, index) => (
+                    <tr key={index} className="bg-[var(--panel)]">
+                      <TD>
+                        <Input value={item.title} onChange={(e) => updateRow(index, { title: e.target.value })} placeholder="Rent" className="h-10 rounded-xl" />
+                      </TD>
+                      <TD>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.amount}
+                          onChange={(e) => updateRow(index, { amount: e.target.value })}
+                          placeholder="0.00"
+                          className="h-10 rounded-xl"
+                        />
+                      </TD>
+                      <TD>
+                        <Input value={item.notes} onChange={(e) => updateRow(index, { notes: e.target.value })} placeholder="Optional note" className="h-10 rounded-xl" />
+                      </TD>
+                      <TD>
+                        <Button type="button" variant="outline" size="sm" onClick={() => removeRow(index)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TD>
+                    </tr>
+                  ))}
+                </TBody>
+              </Table>
+            </div>
+            <div className="text-sm text-[#91a1bc]">
+              Draft expense total: <span className="theme-heading font-semibold">{totalDraftExpense.toFixed(2)}</span>
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setEditorOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => saveExpenses.mutate()} disabled={saveExpenses.isPending}>
+              {saveExpenses.isPending ? <Spinner className="mr-2" /> : <Save className="h-4 w-4" />}
+              Save Expenses
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }

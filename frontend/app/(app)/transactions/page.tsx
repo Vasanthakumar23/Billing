@@ -8,7 +8,6 @@ import { AppShell } from '@/components/app/shell';
 import { PaymentReceiptDialog } from '@/components/app/payment-receipt-dialog';
 import { ReversePaymentDialog, type PaymentRow } from '@/components/app/reverse-payment-dialog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { Table, TBody, TD, TH, THead } from '@/components/ui/table';
@@ -80,139 +79,136 @@ export default function TransactionsPage() {
       }
     >
       <div className="page-grid">
-        <Card>
-          <CardContent className="grid gap-4 xl:grid-cols-[repeat(4,minmax(0,1fr))]">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                <Filter className="h-4 w-4 text-[#4f7cff]" />
-                From
-              </div>
-              <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+        <div className="grid gap-3 xl:grid-cols-[160px_160px_160px_220px] xl:justify-start">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 text-sm font-medium text-[var(--heading)]">
+              <Filter className="h-4 w-4 text-[var(--accent)]" />
+              From
             </div>
-            <div className="space-y-2">
-              <div className="text-sm font-semibold text-white">To</div>
-              <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <div className="text-sm font-semibold text-white">Mode</div>
-              <select
-                className="h-12 rounded-2xl border border-[rgba(151,164,187,0.14)] bg-[rgba(255,255,255,0.04)] px-4 text-sm text-white outline-none"
-                value={mode}
-                onChange={(e) => {
-                  setMode(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="">All</option>
-                <option value="cash">Cash</option>
-                <option value="upi">UPI</option>
-                <option value="bank">Bank</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <div className="text-sm font-semibold text-white">Bill No</div>
-              <Input
-                value={billNo}
-                onChange={(e) => {
-                  setBillNo(e.target.value);
-                  setBillNoDebounced(e.target.value);
-                  setPage(1);
-                }}
-                placeholder="0001"
-              />
-            </div>
-          </CardContent>
-        </Card>
+            <Input className="h-10 rounded-xl" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <div className="text-sm font-medium text-[var(--heading)]">To</div>
+            <Input className="h-10 rounded-xl" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <div className="text-sm font-medium text-[var(--heading)]">Mode</div>
+            <select
+              className="theme-select h-10 w-full rounded-xl px-4 text-sm outline-none"
+              value={mode}
+              onChange={(e) => {
+                setMode(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">All</option>
+              <option value="cash">Cash</option>
+              <option value="upi">UPI</option>
+              <option value="bank">Bank</option>
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <div className="text-sm font-medium text-[var(--heading)]">Bill No</div>
+            <Input
+              className="h-10 rounded-xl"
+              value={billNo}
+              onChange={(e) => {
+                setBillNo(e.target.value);
+                setBillNoDebounced(e.target.value);
+                setPage(1);
+              }}
+              placeholder="0001"
+            />
+          </div>
+        </div>
 
-        <Card>
-          <CardContent>
-            <div className="max-h-[68vh] overflow-auto rounded-[24px] border border-[rgba(151,164,187,0.08)] bg-[rgba(255,255,255,0.02)]">
-              <Table>
-                <THead>
-                  <tr>
-                    <TH>Bill No</TH>
-                    <TH>Receipt</TH>
-                    <TH>Date</TH>
-                    <TH>Student</TH>
-                    <TH>Fee Period</TH>
-                    <TH>Mode</TH>
-                    <TH>Amount</TH>
-                    <TH>Notes</TH>
-                    <TH></TH>
+        <div>
+          <div className="max-h-[68vh] overflow-auto">
+            <Table>
+              <THead>
+                <tr>
+                  <TH>Bill No</TH>
+                  <TH>Receipt</TH>
+                  <TH>Date</TH>
+                  <TH>Student</TH>
+                  <TH>Fee Period</TH>
+                  <TH>Mode</TH>
+                  <TH>Amount</TH>
+                  <TH>Notes</TH>
+                  <TH></TH>
+                </tr>
+              </THead>
+              <TBody>
+                {q.isLoading ? (
+                  <tr className="bg-[var(--panel)]">
+                    <TD colSpan={9}>
+                      <div className="flex items-center gap-2 text-sm text-[#91a1bc]">
+                        <Spinner /> Loading
+                      </div>
+                    </TD>
                   </tr>
-                </THead>
-                <TBody>
-                  {q.isLoading ? (
-                    <tr>
-                      <TD colSpan={9}>
-                        <div className="flex items-center gap-2 text-sm text-[#91a1bc]">
-                          <Spinner /> Loading
+                ) : q.isError ? (
+                  <tr className="bg-[var(--panel)]">
+                    <TD colSpan={9} className="text-sm text-rose-300">Failed to load</TD>
+                  </tr>
+                ) : (
+                  q.data?.items.map((p) => (
+                    <tr key={p.id} className="bg-[var(--panel)]">
+                      <TD className="theme-heading font-semibold">{p.bill_no}</TD>
+                      <TD className="theme-heading font-semibold">{p.receipt_no}</TD>
+                      <TD>{new Date(p.paid_at).toLocaleString()}</TD>
+                      <TD>{p.student_name ?? '-'}</TD>
+                      <TD>{p.fee_period_label ?? '-'}</TD>
+                      <TD className="capitalize">{p.mode}</TD>
+                      <TD className={Number(p.amount) < 0 ? 'font-semibold text-rose-300' : 'theme-heading font-semibold'}>{p.amount}</TD>
+                      <TD className="max-w-[320px] truncate text-[#91a1bc]" title={p.notes ?? ''}>
+                        {p.notes ?? '-'}
+                      </TD>
+                      <TD>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setReceiptPaymentId(p.id);
+                              setReceiptOpen(true);
+                            }}
+                          >
+                            Receipt
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setReversePayment({ id: p.id, receipt_no: p.receipt_no, amount: p.amount, mode: p.mode });
+                              setReverseOpen(true);
+                            }}
+                          >
+                            Reverse
+                          </Button>
                         </div>
                       </TD>
                     </tr>
-                  ) : q.isError ? (
-                    <tr>
-                      <TD colSpan={9} className="text-sm text-rose-300">Failed to load</TD>
-                    </tr>
-                  ) : (
-                    q.data?.items.map((p) => (
-                      <tr key={p.id}>
-                        <TD className="font-semibold text-white">{p.bill_no}</TD>
-                        <TD className="font-semibold text-white">{p.receipt_no}</TD>
-                        <TD>{new Date(p.paid_at).toLocaleString()}</TD>
-                        <TD>{p.student_name ?? '-'}</TD>
-                        <TD>{p.fee_period_label ?? '-'}</TD>
-                        <TD className="capitalize">{p.mode}</TD>
-                        <TD className={Number(p.amount) < 0 ? 'font-semibold text-rose-300' : 'font-semibold text-white'}>{p.amount}</TD>
-                        <TD className="max-w-[320px] truncate text-[#91a1bc]" title={p.notes ?? ''}>
-                          {p.notes ?? '-'}
-                        </TD>
-                        <TD>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setReceiptPaymentId(p.id);
-                                setReceiptOpen(true);
-                              }}
-                            >
-                              Receipt
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setReversePayment({ id: p.id, receipt_no: p.receipt_no, amount: p.amount, mode: p.mode });
-                                setReverseOpen(true);
-                              }}
-                            >
-                              Reverse
-                            </Button>
-                          </div>
-                        </TD>
-                      </tr>
-                    ))
-                  )}
-                </TBody>
-              </Table>
-            </div>
+                  ))
+                )}
+              </TBody>
+            </Table>
+          </div>
 
-            <div className="mt-5 flex items-center justify-between">
-              <div className="text-sm text-[#91a1bc]">
-                Page {page} of {totalPages}
-              </div>
-              <div className="flex gap-3">
-                <Button variant="outline" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                  Prev
-                </Button>
-                <Button variant="outline" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
-                  Next
-                </Button>
-              </div>
+          <div className="mt-5 flex items-center justify-between">
+            <div className="text-sm text-[#91a1bc]">
+              Page {page} of {totalPages}
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex gap-3">
+              <Button variant="outline" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                Prev
+              </Button>
+              <Button variant="outline" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+                Next
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <ReversePaymentDialog open={reverseOpen} onOpenChange={setReverseOpen} payment={reversePayment} onSuccess={() => q.refetch()} />
