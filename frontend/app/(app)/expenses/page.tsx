@@ -19,6 +19,7 @@ type ExpenseItem = {
   title: string;
   amount: string;
   notes?: string | null;
+  created_at: string;
 };
 
 type ExpenseMonthly = {
@@ -41,11 +42,23 @@ function toMonthDate(value: string) {
   return `${value}-01`;
 }
 
+function createEmptyExpense(): EditableExpense {
+  return { title: '', amount: '', notes: '' };
+}
+
+function formatSavedDate(value: string) {
+  return new Date(value).toLocaleDateString(undefined, {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
+}
+
 export default function ExpensesPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
-  const [items, setItems] = useState<EditableExpense[]>([{ title: '', amount: '', notes: '' }]);
+  const [items, setItems] = useState<EditableExpense[]>(() => [createEmptyExpense()]);
 
   const expenseMonth = useMemo(() => toMonthDate(month), [month]);
   const monthly = useQuery({
@@ -66,7 +79,7 @@ export default function ExpensesPage() {
       );
       return;
     }
-    setItems([{ title: '', amount: '', notes: '' }]);
+    setItems([createEmptyExpense()]);
   }, [monthly.data]);
 
   const saveExpenses = useMutation({
@@ -92,11 +105,11 @@ export default function ExpensesPage() {
   });
 
   function addRow() {
-    setItems((current) => [...current, { title: '', amount: '', notes: '' }]);
+    setItems((current) => [...current, createEmptyExpense()]);
   }
 
   function removeRow(index: number) {
-    setItems((current) => (current.length === 1 ? [{ title: '', amount: '', notes: '' }] : current.filter((_, i) => i !== index)));
+    setItems((current) => (current.length === 1 ? [createEmptyExpense()] : current.filter((_, i) => i !== index)));
   }
 
   function updateRow(index: number, patch: Partial<EditableExpense>) {
@@ -150,30 +163,30 @@ export default function ExpensesPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Expense Builder</CardTitle>
+              <CardTitle>Add Expenses</CardTitle>
               <div className="mt-1 text-sm text-[#91a1bc]">
                 Add the expense name and value for this month. Examples: Rent, EB Bill, Salary, Internet.
               </div>
             </div>
             <Button onClick={() => saveExpenses.mutate()} disabled={saveExpenses.isPending}>
               {saveExpenses.isPending ? <Spinner className="mr-2" /> : <Save className="h-4 w-4" />}
-              Save Month
+              Save Expenses
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="overflow-auto rounded-[24px] border border-[rgba(151,164,187,0.08)] bg-[rgba(255,255,255,0.02)]">
-              <Table>
-                <THead>
-                  <tr>
-                    <TH>Expense Name</TH>
-                    <TH>Value</TH>
-                    <TH>Notes</TH>
-                    <TH></TH>
-                  </tr>
-                </THead>
-                <TBody>
-                  {items.map((item, index) => (
-                    <tr key={index}>
+                <Table>
+                  <THead>
+                    <tr>
+                      <TH>Expense Name</TH>
+                      <TH>Value</TH>
+                      <TH>Notes</TH>
+                      <TH></TH>
+                    </tr>
+                  </THead>
+                  <TBody>
+                    {items.map((item, index) => (
+                      <tr key={index}>
                       <TD>
                         <Input value={item.title} onChange={(e) => updateRow(index, { title: e.target.value })} placeholder="Rent" />
                       </TD>
@@ -195,10 +208,10 @@ export default function ExpensesPage() {
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </TD>
-                    </tr>
-                  ))}
-                </TBody>
-              </Table>
+                      </tr>
+                    ))}
+                  </TBody>
+                </Table>
             </div>
             <div className="text-sm text-[#91a1bc]">
               Draft expense total for this editor: <span className="font-semibold text-white">{totalDraftExpense.toFixed(2)}</span>
@@ -222,6 +235,7 @@ export default function ExpensesPage() {
                 <Table>
                   <THead>
                     <tr>
+                      <TH>Saved Date</TH>
                       <TH>Name</TH>
                       <TH>Amount</TH>
                       <TH>Notes</TH>
@@ -230,6 +244,7 @@ export default function ExpensesPage() {
                   <TBody>
                     {monthly.data.items.map((item) => (
                       <tr key={item.id}>
+                        <TD>{formatSavedDate(item.created_at)}</TD>
                         <TD className="font-semibold text-white">{item.title}</TD>
                         <TD>{item.amount}</TD>
                         <TD>{item.notes ?? '-'}</TD>

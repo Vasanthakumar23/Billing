@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
@@ -21,7 +22,9 @@ from app.schemas.settings import (
     BillingSettingsUpdate,
     DatabaseResetRead,
     DatabaseResetRequest,
+    RandomBillRequest,
 )
+from app.services.bill_pdf import render_custom_bill_pdf
 from app.services.billing import cycle_months_for, get_billing_settings
 
 
@@ -109,4 +112,18 @@ def reset_database_route(
         fee_records_deleted=fee_records_deleted,
         receipt_sequence_reset=True,
         billing_cycle_reset_to_default=True,
+    )
+
+
+@router.post("/random-bill.pdf")
+def generate_random_bill_pdf(
+    payload: RandomBillRequest,
+    _: User = Depends(require_admin_user),
+) -> Response:
+    pdf = render_custom_bill_pdf(fields=[(field.label.strip(), field.value.strip()) for field in payload.fields])
+    filename = (payload.file_name.strip() if payload.file_name else "random-bill") or "random-bill"
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}.pdf"'},
     )

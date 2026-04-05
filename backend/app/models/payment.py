@@ -16,9 +16,12 @@ class Payment(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __table_args__ = (
         CheckConstraint("amount <> 0", name="ck_payments_amount_nonzero"),
         Index("ix_payments_student_paid_at", "student_id", "paid_at"),
+        Index("ux_payments_academic_period_bill_no", "academic_period", "bill_no", unique=True),
     )
 
     receipt_no: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
+    academic_period: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    bill_no: Mapped[int] = mapped_column(nullable=False)
     student_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("students.id"), nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     mode: Mapped[PaymentMode] = mapped_column(Enum(PaymentMode, name="payment_mode"), nullable=False)

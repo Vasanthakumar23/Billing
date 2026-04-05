@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle, Upload } from 'lucide-react';
+import { AlertTriangle, FileText, Plus, Trash2, Upload } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { AppShell } from '@/components/app/shell';
@@ -40,6 +40,12 @@ type DatabaseResetResult = {
   billing_cycle_reset_to_default: boolean;
 };
 
+type RandomBillField = {
+  id: string;
+  label: string;
+  value: string;
+};
+
 const RESET_CONFIRMATION_TEXT = 'DELETE ALL DATA';
 const IMPORT_FIELD_META: Array<{ key: ImportFieldKey; label: string; hint: string }> = [
   { key: 'serial_no', label: 'Serial No', hint: 'Map the source serial / row number column.' },
@@ -65,10 +71,19 @@ const MONTH_OPTIONS = [
   'December'
 ] as const;
 
+function createRandomBillField(): RandomBillField {
+  return {
+    id: Math.random().toString(36).slice(2, 10),
+    label: '',
+    value: ''
+  };
+}
+
 export default function SettingsPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [importOpen, setImportOpen] = useState(false);
+  const [randomBillOpen, setRandomBillOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importMode, setImportMode] = useState<'upsert' | 'create_only'>('upsert');
@@ -85,6 +100,12 @@ export default function SettingsPage() {
   const [importBatch, setImportBatch] = useState('');
   const [importBatchStartMonth, setImportBatchStartMonth] = useState('');
   const [resetText, setResetText] = useState('');
+  const [randomBillFileName, setRandomBillFileName] = useState('');
+  const [randomBillFields, setRandomBillFields] = useState<RandomBillField[]>(() => [
+    { id: 'bill-no', label: 'Bill No', value: '' },
+    { id: 'student', label: 'Student', value: '' },
+    { id: 'amount', label: 'Amount', value: '' }
+  ]);
   const importStudents = useMutation({
     mutationFn: async () => {
       if (!importFile) throw new Error('Please choose an .xlsx file');
@@ -175,12 +196,55 @@ export default function SettingsPage() {
     },
     onError: (e) => toast({ title: 'Delete failed', description: String(e) })
   });
+  const generateRandomBill = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/backend/settings/random-bill.pdf', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file_name: randomBillFileName.trim() || null,
+          fields: randomBillFields.map((field) => ({
+            label: field.label.trim(),
+            value: field.value.trim()
+          }))
+        })
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error?.detail ? JSON.stringify(error.detail) : 'Bill generation failed');
+      }
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = downloadUrl;
+      anchor.download = `${randomBillFileName.trim() || 'random-bill'}.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    },
+    onSuccess: () => {
+      toast({ title: 'Bill generated', description: 'The bill PDF has been downloaded.' });
+      setRandomBillOpen(false);
+      setRandomBillFileName('');
+      setRandomBillFields([
+        { id: 'bill-no', label: 'Bill No', value: '' },
+        { id: 'student', label: 'Student', value: '' },
+        { id: 'amount', label: 'Amount', value: '' }
+      ]);
+    },
+    onError: (e) => toast({ title: 'Bill generation failed', description: String(e) })
+  });
 
   const isImportReady =
     importPreview !== null &&
     IMPORT_FIELD_META.every((field) => importMapping[field.key].trim() !== '') &&
     /^\d{4}\s*-\s*\d{4}$/.test(importBatch.trim()) &&
     Boolean(importBatchStartMonth);
+  const isRandomBillReady =
+    randomBillFields.length > 0 &&
+    randomBillFields.every((field) => field.label.trim() !== '' && field.value.trim() !== '');
 
   return (
     <AppShell title="Admin Settings" subtitle="Manage student imports and controlled maintenance actions.">
@@ -199,6 +263,24 @@ export default function SettingsPage() {
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="h-4 w-4" />
             Upload Student Excel
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-4">
+        <CardHeader>
+          <CardTitle>Random Bill Generator</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-2xl border border-[rgba(151,164,187,0.12)] bg-[rgba(255,255,255,0.03)] p-4">
+            <div className="text-sm font-semibold text-white">Generate a manual bill PDF</div>
+            <div className="mt-2 text-sm text-[#91a1bc]">
+              Open the generator, fill the bill content manually, and download the generated bill directly.
+            </div>
+          </div>
+          <Button variant="outline" onClick={() => setRandomBillOpen(true)}>
+            <FileText className="h-4 w-4" />
+            Open Bill Generator
           </Button>
         </CardContent>
       </Card>
@@ -405,6 +487,93 @@ export default function SettingsPage() {
             <Button type="button" onClick={() => importStudents.mutate()} disabled={importStudents.isPending || !isImportReady}>
               {importStudents.isPending ? <Spinner className="mr-2" /> : null}
               Import
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={randomBillOpen}
+        onOpenChange={(v) => {
+          setRandomBillOpen(v);
+          if (!v) {
+            setRandomBillFileName('');
+            setRandomBillFields([
+              { id: 'bill-no', label: 'Bill No', value: '' },
+              { id: 'student', label: 'Student', value: '' },
+              { id: 'amount', label: 'Amount', value: '' }
+            ]);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Random Bill Generator</DialogTitle>
+          </DialogHeader>
+          <DialogBody className="space-y-3">
+            <div className="text-sm text-[#91a1bc]">
+              Add the exact bill fields you want. You can create new label/value rows and the PDF will use those rows directly.
+            </div>
+            <div>
+              <div className="mb-2 text-sm font-medium text-[#dbe6ff]">File Name</div>
+              <Input value={randomBillFileName} onChange={(e) => setRandomBillFileName(e.target.value)} placeholder="random-bill" />
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-medium text-[#dbe6ff]">Bill Fields</div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRandomBillFields((current) => [...current, createRandomBillField()])}
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Field
+                </Button>
+              </div>
+              {randomBillFields.map((field) => (
+                <div key={field.id} className="grid gap-3 md:grid-cols-[0.42fr_0.48fr_auto]">
+                  <Input
+                    value={field.label}
+                    onChange={(e) =>
+                      setRandomBillFields((current) =>
+                        current.map((item) => (item.id === field.id ? { ...item, label: e.target.value } : item))
+                      )
+                    }
+                    placeholder="Label"
+                  />
+                  <Input
+                    value={field.value}
+                    onChange={(e) =>
+                      setRandomBillFields((current) =>
+                        current.map((item) => (item.id === field.id ? { ...item, value: e.target.value } : item))
+                      )
+                    }
+                    placeholder="Value"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setRandomBillFields((current) =>
+                        current.length === 1 ? [createRandomBillField()] : current.filter((item) => item.id !== field.id)
+                      )
+                    }
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setRandomBillOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => generateRandomBill.mutate()} disabled={generateRandomBill.isPending || !isRandomBillReady}>
+              {generateRandomBill.isPending ? <Spinner className="mr-2" /> : null}
+              Generate & Download
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -15,6 +15,8 @@ export type ReceiptData = {
   fee_period_label?: string | null;
   reference_no?: string | null;
   notes?: string | null;
+  next_due_label?: string | null;
+  pending_amount?: string | null;
 };
 
 export function Receipt({ data, onClose }: { data: ReceiptData; onClose: () => void }) {
@@ -55,10 +57,10 @@ export function Receipt({ data, onClose }: { data: ReceiptData; onClose: () => v
             <div className="text-[#91a1bc]">Paid At</div>
             <div className="font-semibold text-white">{new Date(data.paid_at).toLocaleString()}</div>
           </div>
-          {data.reference_no ? (
+          {data.reference_no || data.notes ? (
             <div className="text-sm">
-              <div className="text-[#91a1bc]">Reference</div>
-              <div className="font-semibold text-white">{data.reference_no}</div>
+              <div className="text-[#91a1bc]">Remarks</div>
+              <div className="font-semibold text-white">{data.reference_no ?? data.notes}</div>
             </div>
           ) : null}
           {data.notes ? (

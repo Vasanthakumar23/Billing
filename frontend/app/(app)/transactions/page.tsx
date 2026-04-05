@@ -18,6 +18,8 @@ import { debounce } from '@/lib/debounce';
 type Payment = {
   id: string;
   receipt_no: string;
+  bill_no: string;
+  academic_period: string;
   student_id: string;
   student_name?: string | null;
   paid_at: string;
@@ -31,8 +33,8 @@ export default function TransactionsPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [mode, setMode] = useState('');
-  const [receipt, setReceipt] = useState('');
-  const [debouncedReceipt, setDebouncedReceipt] = useState('');
+  const [billNo, setBillNo] = useState('');
+  const [debouncedBillNo, setDebouncedBillNo] = useState('');
   const [page, setPage] = useState(1);
   const pageSize = 50;
 
@@ -41,10 +43,10 @@ export default function TransactionsPage() {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptPaymentId, setReceiptPaymentId] = useState<string | null>(null);
 
-  const setReceiptDebounced = useMemo(() => debounce((v: string) => setDebouncedReceipt(v), 250), []);
+  const setBillNoDebounced = useMemo(() => debounce((v: string) => setDebouncedBillNo(v), 250), []);
 
   const q = useQuery({
-    queryKey: ['payments', from, to, mode, debouncedReceipt, page],
+    queryKey: ['payments', from, to, mode, debouncedBillNo, page],
     queryFn: () => {
       const params = new URLSearchParams();
       params.set('page', String(page));
@@ -52,7 +54,7 @@ export default function TransactionsPage() {
       if (from) params.set('from', new Date(from).toISOString());
       if (to) params.set('to', new Date(to).toISOString());
       if (mode) params.set('mode', mode);
-      if (debouncedReceipt) params.set('receipt_no', debouncedReceipt);
+      if (debouncedBillNo) params.set('bill_no', debouncedBillNo);
       return apiFetch<{ items: Payment[]; total: number }>(`/payments?${params.toString()}`);
     }
   });
@@ -62,7 +64,7 @@ export default function TransactionsPage() {
   return (
     <AppShell
       title="Transactions"
-      subtitle="Filter receipts, inspect payment cycles, and reverse incorrect transactions with a full audit trail."
+      subtitle="Filter bill numbers, inspect payment cycles, and reverse incorrect transactions with a full audit trail."
       action={
         <Button
           onClick={() => {
@@ -108,15 +110,15 @@ export default function TransactionsPage() {
               </select>
             </div>
             <div className="space-y-2">
-              <div className="text-sm font-semibold text-white">Receipt</div>
+              <div className="text-sm font-semibold text-white">Bill No</div>
               <Input
-                value={receipt}
+                value={billNo}
                 onChange={(e) => {
-                  setReceipt(e.target.value);
-                  setReceiptDebounced(e.target.value);
+                  setBillNo(e.target.value);
+                  setBillNoDebounced(e.target.value);
                   setPage(1);
                 }}
-                placeholder="FEE-123"
+                placeholder="0001"
               />
             </div>
           </CardContent>
@@ -128,6 +130,7 @@ export default function TransactionsPage() {
               <Table>
                 <THead>
                   <tr>
+                    <TH>Bill No</TH>
                     <TH>Receipt</TH>
                     <TH>Date</TH>
                     <TH>Student</TH>
@@ -141,7 +144,7 @@ export default function TransactionsPage() {
                 <TBody>
                   {q.isLoading ? (
                     <tr>
-                      <TD colSpan={8}>
+                      <TD colSpan={9}>
                         <div className="flex items-center gap-2 text-sm text-[#91a1bc]">
                           <Spinner /> Loading
                         </div>
@@ -149,11 +152,12 @@ export default function TransactionsPage() {
                     </tr>
                   ) : q.isError ? (
                     <tr>
-                      <TD colSpan={8} className="text-sm text-rose-300">Failed to load</TD>
+                      <TD colSpan={9} className="text-sm text-rose-300">Failed to load</TD>
                     </tr>
                   ) : (
                     q.data?.items.map((p) => (
                       <tr key={p.id}>
+                        <TD className="font-semibold text-white">{p.bill_no}</TD>
                         <TD className="font-semibold text-white">{p.receipt_no}</TD>
                         <TD>{new Date(p.paid_at).toLocaleString()}</TD>
                         <TD>{p.student_name ?? '-'}</TD>

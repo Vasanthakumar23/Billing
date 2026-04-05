@@ -90,10 +90,14 @@ export function AppShell({
         </nav>
 
         <div className="mt-8 border-t border-[var(--sidebar-border)] pt-5 lg:mt-auto lg:pt-6">
-          <Button variant="secondary" className="mb-3 w-full justify-start text-white [&_svg]:text-[#dbe6ff]" onClick={toggleTheme}>
+          {/* <Button
+            variant="outline"
+            className="mb-3 w-full justify-start border-[var(--sidebar-border)] bg-[var(--sidebar-hover)] text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover)] [&_svg]:text-[var(--sidebar-muted)]"
+            onClick={toggleTheme}
+          >
             {theme === 'dark' ? <SunMedium className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-          </Button>
+          </Button> */}
           <Button
             variant="outline"
             className="w-full justify-start text-[#172033] [&_svg]:text-[#172033]"

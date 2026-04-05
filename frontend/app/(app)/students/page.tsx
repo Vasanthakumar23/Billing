@@ -108,52 +108,45 @@ export default function StudentsPage() {
       }
     >
       <div className="page-grid">
-        <Card>
-          <CardContent className="space-y-5">
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_160px]">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7484a1]" />
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search by student name or roll number"
-                  className="pl-11"
-                />
-              </div>
+        <div className="space-y-3">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_200px_150px]">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7484a1]" />
               <Input
-                value={classCode}
-                onChange={(e) => {
-                  const next = e.target.value.replace(/\D/g, '').slice(0, 2);
-                  setClassCode(next);
-                  setPage(1);
-                }}
-                placeholder="Class code, e.g. 05"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by student name or roll number"
+                className="h-11 rounded-xl border-[var(--panel-line)] bg-transparent pl-11"
               />
-              <select
-                className="theme-select h-12 rounded-2xl px-4 text-sm outline-none"
-                value={status}
-                onChange={(e) => {
-                  setStatus(e.target.value as 'all' | 'active' | 'inactive');
-                  setPage(1);
-                }}
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="all">All</option>
-              </select>
             </div>
-            <div className="text-xs text-[#91a1bc]">
-              Use the class filter for roll numbers where the first two digits represent the class, for example <span className="theme-heading">05xx</span>.
-            </div>
-            <div className="text-sm text-[#91a1bc]">
-              Showing <span className="theme-heading font-semibold">{query.data?.total ?? 0}</span> student records
-            </div>
-          </CardContent>
-        </Card>
+            <Input
+              value={classCode}
+              onChange={(e) => {
+                const next = e.target.value.replace(/\D/g, '').slice(0, 2);
+                setClassCode(next);
+                setPage(1);
+              }}
+              placeholder="Class code"
+              className="h-11 rounded-xl border-[var(--panel-line)] bg-transparent"
+            />
+            <select
+              className="theme-select h-11 rounded-xl px-4 text-sm outline-none"
+              value={status}
+              onChange={(e) => {
+                setStatus(e.target.value as 'all' | 'active' | 'inactive');
+                setPage(1);
+              }}
+            >
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="all">All</option>
+            </select>
+          </div>
+        </div>
 
-        <Card>
-          <CardContent>
-            <div className="theme-table-wrap overflow-auto rounded-[24px]">
+        <Card className="shadow-none">
+          <CardContent className="p-0">
+            <div className="overflow-auto">
               <Table>
                 <THead>
                   <tr>
@@ -209,7 +202,7 @@ export default function StudentsPage() {
                             <span className="text-sm text-[#91a1bc]">Fully paid</span>
                           )}
                         </TD>
-                        <TD className={Number(s.pending) > 0 ? 'font-semibold text-white' : ''}>{s.pending}</TD>
+                        <TD className={Number(s.pending) > 0 ? 'theme-heading font-semibold' : ''}>{s.pending}</TD>
                         <TD>
                           <Badge className={s.status === 'active' ? 'theme-chip-success' : 'theme-chip-neutral'}>
                             {s.status}
@@ -237,22 +230,22 @@ export default function StudentsPage() {
                 </TBody>
               </Table>
             </div>
-
-            <div className="mt-5 flex items-center justify-between">
-              <div className="text-sm text-[#91a1bc]">
-                Page {page} of {totalPages}
-              </div>
-              <div className="flex gap-3">
-                <Button variant="outline" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                  Prev
-                </Button>
-                <Button variant="outline" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
-                  Next
-                </Button>
-              </div>
-            </div>
           </CardContent>
         </Card>
+
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-[#91a1bc]">
+            Page {page} of {totalPages}
+          </div>
+          <div className="flex gap-3">
+            <Button variant="outline" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+              Prev
+            </Button>
+            <Button variant="outline" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+              Next
+            </Button>
+          </div>
+        </div>
       </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

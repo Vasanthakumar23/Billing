@@ -404,7 +404,7 @@ export default function CollectPage() {
                 </div>
                 <Button type="submit" disabled={createPayment.isPending || !selectedStudent?.id || selectedMonths.length === 0}>
                   {createPayment.isPending ? <Spinner className="mr-2" /> : null}
-                  Charge {payableAmount}
+                  Pay {payableAmount}
                 </Button>
               </form>
             </CardContent>

@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.enums import PaymentCycle, PaymentMode
 
@@ -24,6 +24,8 @@ class PaymentCreate(BaseModel):
 class PaymentRead(BaseModel):
     id: uuid.UUID
     receipt_no: str
+    academic_period: str
+    bill_no: str
     student_id: uuid.UUID
     student_name: str | None = None
     student_code: str | None = None
@@ -38,6 +40,17 @@ class PaymentRead(BaseModel):
     billing_cycle_months: int | None = None
     cycle_mode: PaymentCycle | None = None
     fee_period_label: str | None = None
+    next_due_label: str | None = None
+    pending_amount: Decimal | None = None
+
+    @field_validator("bill_no", mode="before")
+    @classmethod
+    def _format_bill_no(cls, value: object) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, int):
+            return str(value).zfill(4)
+        return str(value)
 
     class Config:
         from_attributes = True

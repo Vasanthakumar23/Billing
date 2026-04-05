@@ -55,8 +55,8 @@ export function LoginClient() {
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent_20%),linear-gradient(180deg,rgba(15,23,34,0.08),transparent_60%)]" />
       <div className="grid w-full max-w-5xl gap-6 lg:grid-cols-[1.05fr_0.95fr]">
         <div className="glass-panel rounded-2xl p-8 lg:p-10">
-          <div className="section-label">Institution Billing</div>
-          <h1 className="mt-4 max-w-2xl text-4xl font-semibold text-white">Centralized billing operations for structured institutions.</h1>
+          <div className="section-label">Billing Application</div>
+          <h1 className="mt-4 max-w-2xl text-5xl font-semibold text-white lg:text-6xl">MY ACADEMY</h1>
           <p className="mt-5 max-w-xl text-base text-[#91a1bc]">
             Manage student dues, cycle-based collections, receipts, and reporting from one secure admin workspace.
           </p>

@@ -35,7 +35,7 @@ def test_payment_generates_unique_receipt(client):
     headers = auth_header(client)
     s = client.post(
         "/api/students",
-        json={"student_code": "S002", "name": "Bob"},
+        json={"student_code": "S002", "name": "Bob", "batch": "2026-2027", "batch_start_month": 5},
         headers=headers,
     )
     student_id = s.json()["id"]
@@ -53,6 +53,70 @@ def test_payment_generates_unique_receipt(client):
     assert p1.status_code == 201
     assert p2.status_code == 201
     assert p1.json()["receipt_no"] != p2.json()["receipt_no"]
+    assert p1.json()["bill_no"] == "0001"
+    assert p2.json()["bill_no"] == "0002"
+
+
+def test_bill_no_resets_for_new_academic_period(client):
+    headers = auth_header(client)
+    s1 = client.post(
+        "/api/students",
+        json={"student_code": "S002A", "name": "Bob A", "batch": "2026-2027", "batch_start_month": 5},
+        headers=headers,
+    )
+    s2 = client.post(
+        "/api/students",
+        json={"student_code": "S002B", "name": "Bob B", "batch": "2027-2028", "batch_start_month": 5},
+        headers=headers,
+    )
+
+    p1 = client.post(
+        "/api/payments",
+        json={"student_id": s1.json()["id"], "student_code": "S002A", "billing_start_month": "2026-05-01", "mode": "cash"},
+        headers=headers,
+    )
+    p2 = client.post(
+        "/api/payments",
+        json={"student_id": s2.json()["id"], "student_code": "S002B", "billing_start_month": "2027-05-01", "mode": "cash"},
+        headers=headers,
+    )
+
+    assert p1.status_code == 201
+    assert p2.status_code == 201
+    assert p1.json()["academic_period"] == "2026-2027"
+    assert p2.json()["academic_period"] == "2027-2028"
+    assert p1.json()["bill_no"] == "0001"
+    assert p2.json()["bill_no"] == "0001"
+
+
+def test_list_payments_filters_by_bill_no(client):
+    headers = auth_header(client)
+    student = client.post(
+        "/api/students",
+        json={"student_code": "S002C", "name": "Bob C", "batch": "2026-2027", "batch_start_month": 5},
+        headers=headers,
+    )
+    student_id = student.json()["id"]
+
+    first = client.post(
+        "/api/payments",
+        json={"student_id": student_id, "student_code": "S002C", "billing_start_month": "2026-05-01", "mode": "cash"},
+        headers=headers,
+    )
+    second = client.post(
+        "/api/payments",
+        json={"student_id": student_id, "student_code": "S002C", "billing_start_month": "2026-06-01", "mode": "upi"},
+        headers=headers,
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+
+    filtered = client.get("/api/payments?bill_no=0002", headers=headers)
+    assert filtered.status_code == 200
+    data = filtered.json()
+    assert data["total"] == 1
+    assert data["items"][0]["bill_no"] == "0002"
 
 
 def test_reverse_payment_creates_negative_entry(client):
@@ -159,6 +223,53 @@ def test_duplicate_month_payment_is_blocked(client):
     assert first.status_code == 201
     assert second.status_code == 409
     assert "already paid" in second.json()["detail"].lower()
+
+
+def test_expense_rows_include_created_at(client):
+    headers = auth_header(client)
+
+    saved = client.put(
+        "/api/expenses/monthly",
+        json={
+            "month": "2026-04-01",
+            "items": [
+                {
+                    "title": "Internet",
+                    "amount": 850,
+                    "notes": "April bill",
+                }
+            ],
+        },
+        headers=headers,
+    )
+    assert saved.status_code == 200
+    saved_data = saved.json()
+    assert saved_data["items"][0]["created_at"]
+
+    fetched = client.get("/api/expenses/monthly?month=2026-04-01", headers=headers)
+    assert fetched.status_code == 200
+    fetched_data = fetched.json()
+    assert fetched_data["items"][0]["created_at"]
+
+
+def test_admin_can_generate_random_bill_pdf(client):
+    headers = auth_header(client)
+    response = client.post(
+        "/api/settings/random-bill.pdf",
+        json={
+            "file_name": "manual-demo",
+            "fields": [
+                {"label": "Bill No", "value": "25"},
+                {"label": "Student", "value": "Demo Student"},
+                {"label": "Amount", "value": "1000.00"},
+            ],
+        },
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert "manual-demo.pdf" in response.headers["content-disposition"]
+    assert response.content.startswith(b"%PDF")
 
 
 def test_reversal_reopens_billing_periods(client):
