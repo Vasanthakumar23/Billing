@@ -19,6 +19,8 @@ class StudentCreate(BaseModel):
     joined_date: date | None = None
     batch: str | None = Field(default=None, max_length=20)
     batch_start_month: int | None = Field(default=None, ge=1, le=12)
+    billing_start_month: int | None = Field(default=None, ge=1, le=12)
+    billing_end_month: int | None = Field(default=None, ge=1, le=12)
 
 
 class StudentUpdate(BaseModel):
@@ -30,6 +32,8 @@ class StudentUpdate(BaseModel):
     joined_date: date | None = None
     batch: str | None = Field(default=None, max_length=20)
     batch_start_month: int | None = Field(default=None, ge=1, le=12)
+    billing_start_month: int | None = Field(default=None, ge=1, le=12)
+    billing_end_month: int | None = Field(default=None, ge=1, le=12)
     status: StudentStatus | None = None
 
 
@@ -44,6 +48,8 @@ class StudentRead(BaseModel):
     joined_date: date | None = None
     batch: str | None = None
     batch_start_month: int | None = None
+    billing_start_month: int | None = None
+    billing_end_month: int | None = None
     status: StudentStatus
     created_at: datetime
     updated_at: datetime
@@ -73,6 +79,8 @@ class StudentListItem(BaseModel):
     joined_date: date | None = None
     batch: str | None = None
     batch_start_month: int | None = None
+    billing_start_month: int | None = None
+    billing_end_month: int | None = None
     status: StudentStatus
     expected_fee: Decimal
     paid_total: Decimal
@@ -132,6 +140,8 @@ class StudentImportMapping(BaseModel):
     expected_fee: str | None = None
     payment_period: str | None = None
     joined_date: str | None = None
+    billing_start_period: str | None = None
+    billing_end_period: str | None = None
 
 
 class StudentImportPreviewRead(BaseModel):

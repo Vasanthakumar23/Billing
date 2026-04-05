@@ -20,7 +20,9 @@ type ImportFieldKey =
   | 'class_name'
   | 'expected_fee'
   | 'payment_period'
-  | 'joined_date';
+  | 'joined_date'
+  | 'billing_start_period'
+  | 'billing_end_period';
 
 type StudentImportMapping = Record<ImportFieldKey, string>;
 
@@ -54,23 +56,10 @@ const IMPORT_FIELD_META: Array<{ key: ImportFieldKey; label: string; hint: strin
   { key: 'class_name', label: 'Class', hint: 'Class or standard. Values like 10-A will be split automatically.' },
   { key: 'expected_fee', label: 'Fee', hint: 'Single-month fee amount.' },
   { key: 'payment_period', label: 'Period', hint: 'Monthly, Quarterly, Half Yearly, or source label.' },
-  { key: 'joined_date', label: 'Joined Date', hint: 'Student joining/admission date.' }
+  { key: 'joined_date', label: 'Joined Date', hint: 'Student joining/admission date.' },
+  { key: 'billing_start_period', label: 'Start Period', hint: 'Student-specific billing start month, for example Jun.' },
+  { key: 'billing_end_period', label: 'End Period', hint: 'Student-specific billing end month, for example Apr.' }
 ];
-const MONTH_OPTIONS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December'
-] as const;
-
 function createRandomBillField(): RandomBillField {
   return {
     id: Math.random().toString(36).slice(2, 10),
@@ -95,10 +84,11 @@ export default function SettingsPage() {
     class_name: '',
     expected_fee: '',
     payment_period: '',
-    joined_date: ''
+    joined_date: '',
+    billing_start_period: '',
+    billing_end_period: ''
   });
   const [importBatch, setImportBatch] = useState('');
-  const [importBatchStartMonth, setImportBatchStartMonth] = useState('');
   const [resetText, setResetText] = useState('');
   const [randomBillFileName, setRandomBillFileName] = useState('');
   const [randomBillFields, setRandomBillFields] = useState<RandomBillField[]>(() => [
@@ -110,12 +100,10 @@ export default function SettingsPage() {
     mutationFn: async () => {
       if (!importFile) throw new Error('Please choose an .xlsx file');
       if (!importBatch.trim()) throw new Error('Please enter the batch value');
-      if (!importBatchStartMonth) throw new Error('Please choose the batch start month');
       const fd = new FormData();
       fd.append('file', importFile);
       fd.append('mapping_json', JSON.stringify(importMapping));
       fd.append('batch', importBatch.trim());
-      fd.append('batch_start_month', importBatchStartMonth);
 
       const res = await fetch(`/api/backend/students/import?mode=${encodeURIComponent(importMode)}`, {
         method: 'POST',
@@ -135,7 +123,6 @@ export default function SettingsPage() {
       setImportFile(null);
       setImportPreview(null);
       setImportBatch('');
-      setImportBatchStartMonth('');
       setImportMapping({
         serial_no: '',
         student_code: '',
@@ -143,7 +130,9 @@ export default function SettingsPage() {
         class_name: '',
         expected_fee: '',
         payment_period: '',
-        joined_date: ''
+        joined_date: '',
+        billing_start_period: '',
+        billing_end_period: ''
       });
       qc.invalidateQueries({ queryKey: ['students'] });
     },
@@ -173,7 +162,9 @@ export default function SettingsPage() {
         class_name: data.suggested_mapping.class_name ?? '',
         expected_fee: data.suggested_mapping.expected_fee ?? '',
         payment_period: data.suggested_mapping.payment_period ?? '',
-        joined_date: data.suggested_mapping.joined_date ?? ''
+        joined_date: data.suggested_mapping.joined_date ?? '',
+        billing_start_period: data.suggested_mapping.billing_start_period ?? '',
+        billing_end_period: data.suggested_mapping.billing_end_period ?? ''
       });
     },
     onError: (e) => toast({ title: 'Preview failed', description: String(e) })
@@ -240,8 +231,7 @@ export default function SettingsPage() {
   const isImportReady =
     importPreview !== null &&
     IMPORT_FIELD_META.every((field) => importMapping[field.key].trim() !== '') &&
-    /^\d{4}\s*-\s*\d{4}$/.test(importBatch.trim()) &&
-    Boolean(importBatchStartMonth);
+    /^\d{4}\s*-\s*\d{4}$/.test(importBatch.trim());
   const isRandomBillReady =
     randomBillFields.length > 0 &&
     randomBillFields.every((field) => field.label.trim() !== '' && field.value.trim() !== '');
@@ -322,7 +312,6 @@ export default function SettingsPage() {
             setImportMode('upsert');
             setImportPreview(null);
             setImportBatch('');
-            setImportBatchStartMonth('');
             setImportMapping({
               serial_no: '',
               student_code: '',
@@ -330,7 +319,9 @@ export default function SettingsPage() {
               class_name: '',
               expected_fee: '',
               payment_period: '',
-              joined_date: ''
+              joined_date: '',
+              billing_start_period: '',
+              billing_end_period: ''
             });
           }
         }}
@@ -343,7 +334,8 @@ export default function SettingsPage() {
             <div className="space-y-3">
               <div className="text-sm text-[#91a1bc]">
                 Upload an <span className="font-medium text-white">.xlsx</span>, load its headers, map the required fields,
-                enter the academic <span className="font-medium text-white">batch</span> and batch start month, then import into the database.
+                enter the academic <span className="font-medium text-white">batch</span>, then import into the database.
+                Student billing will follow each row's mapped <span className="font-medium text-white">Start Period</span> and <span className="font-medium text-white">End Period</span>.
               </div>
 
               <div>
@@ -363,7 +355,7 @@ export default function SettingsPage() {
                 <input
                   type="file"
                   accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  className="block w-full text-sm text-[#91a1bc] file:mr-4 file:rounded-2xl file:border-0 file:bg-[rgba(79,124,255,0.16)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+                  className="block w-full rounded-2xl border border-[rgba(151,164,187,0.16)] bg-[rgba(255,255,255,0.04)] px-3 py-3 text-sm text-[var(--text)] file:mr-4 file:rounded-xl file:border-0 file:bg-[#2f6fed] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-[#255ed1]"
                   onChange={(e) => {
                     setImportFile(e.target.files?.[0] ?? null);
                     setImportPreview(null);
@@ -426,26 +418,8 @@ export default function SettingsPage() {
                         placeholder="2026-2027"
                       />
                       <div className="mt-1 text-xs text-[#91a1bc]">
-                        Enter the academic batch for all imported rows, for example <span className="text-white">2026-2027</span>.
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="mb-2 text-sm font-medium text-[#dbe6ff]">Batch Start Month</div>
-                      <select
-                        className="h-12 w-full rounded-2xl border border-[rgba(151,164,187,0.14)] bg-[rgba(255,255,255,0.04)] px-4 text-sm text-white outline-none"
-                        value={importBatchStartMonth}
-                        onChange={(e) => setImportBatchStartMonth(e.target.value)}
-                      >
-                        <option value="">Select batch start month</option>
-                        {MONTH_OPTIONS.map((month) => (
-                          <option key={month} value={month}>
-                            {month}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="mt-1 text-xs text-[#91a1bc]">
-                        Example: choose <span className="text-white">May</span> for an academic year running from May 2026 to April 2027.
+                        Enter the academic batch for all imported rows, for example <span className="text-white">2026-2027</span>. Each student's
+                        mapped <span className="text-white">Start Period</span> and <span className="text-white">End Period</span> will control that student's billing range.
                       </div>
                     </div>
 

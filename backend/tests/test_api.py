@@ -178,9 +178,9 @@ def test_import_students_from_excel(client):
     headers = auth_header(client)
     wb = Workbook()
     ws = wb.active
-    ws.append(["rollno", "name", "std", "section", "fees"])
-    ws.append(["S010", "Eve", "10", "B", 1200])
-    ws.append(["S011", "Frank", "9", "A", "900.50"])
+    ws.append(["S.NO", "R.NO", "NAME", "CLASS", "FEE", "PERIOD", "JOINED DATE", "START", "END"])
+    ws.append([1, "S010", "Eve", "10-B", 1200, "MONTHLY", "2026-05-20", "JUN", "APR"])
+    ws.append([2, "S011", "Frank", "9-A", "900.50", "QUARTERLY", "2026-05-20", "NOV", "APR"])
     buf = BytesIO()
     wb.save(buf)
     payload = buf.getvalue()
@@ -188,6 +188,7 @@ def test_import_students_from_excel(client):
     resp = client.post(
         "/api/students/import",
         headers=headers,
+        data={"batch": "2026-2027", "batch_start_month": "May"},
         files={
             "file": (
                 "students.xlsx",
@@ -201,6 +202,26 @@ def test_import_students_from_excel(client):
     assert data["created"] == 2
     assert data["updated"] == 0
     assert data["fee_updated"] == 2
+
+    students = client.get("/api/students?search=S011", headers=headers)
+    assert students.status_code == 200
+    student = students.json()["items"][0]
+    assert student["billing_start_month"] == 11
+    assert student["billing_end_month"] == 4
+
+    overview = client.get(f"/api/students/{student['id']}/billing-overview", headers=headers)
+    assert overview.status_code == 200
+    overview_data = overview.json()
+    assert overview_data["batch_start_label"] == "Nov 2026"
+    assert overview_data["batch_end_label"] == "Apr 2027"
+    assert [item["label"] for item in overview_data["months"]] == [
+        "Nov 2026",
+        "Dec 2026",
+        "Jan 2027",
+        "Feb 2027",
+        "Mar 2027",
+        "Apr 2027",
+    ]
 
 
 def test_duplicate_month_payment_is_blocked(client):

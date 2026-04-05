@@ -149,8 +149,16 @@ def batch_start_month_for(student: Student) -> int:
     return min(max(value, 1), 12)
 
 
+def bounded_month(value: int | None) -> int | None:
+    if value is None:
+        return None
+    return min(max(value, 1), 12)
+
+
 def batch_range_for(student: Student) -> tuple[date, date]:
     start_month = batch_start_month_for(student)
+    student_start_month = bounded_month(student.billing_start_month)
+    student_end_month = bounded_month(student.billing_end_month)
     if student.batch:
         match = _BATCH_RE.match(student.batch)
         if match:
@@ -158,9 +166,22 @@ def batch_range_for(student: Student) -> tuple[date, date]:
             end_year = int(match.group(2))
             expected_end_year = start_year + (1 if start_month != 1 else 0)
             if end_year == expected_end_year:
+                if student_start_month and student_end_month:
+                    student_start = date(start_year, student_start_month, 1)
+                    student_end_year = end_year if student_end_month < student_start_month else start_year
+                    student_end = date(student_end_year, student_end_month, 1)
+                    if student_end >= student_start:
+                        return student_start, student_end
                 start = date(start_year, start_month, 1)
                 return start, add_months(start, 11)
     anchor = student.joined_date or datetime.now(UTC).date()
+    if student_start_month and student_end_month:
+        start_year = anchor.year if anchor.month <= student_start_month else anchor.year + 1
+        end_year = start_year if student_end_month >= student_start_month else start_year + 1
+        start = date(start_year, student_start_month, 1)
+        end = date(end_year, student_end_month, 1)
+        if end >= start:
+            return start, end
     start_year = anchor.year if anchor.month >= start_month else anchor.year - 1
     start = date(start_year, start_month, 1)
     return start, add_months(start, 11)

@@ -50,6 +50,8 @@ _REQUIRED_IMPORT_FIELDS = [
     "expected_fee",
     "payment_period",
     "joined_date",
+    "billing_start_period",
+    "billing_end_period",
 ]
 
 
@@ -176,6 +178,8 @@ def _default_import_mapping(headers: dict[str, int], ordered_headers: list[str])
         expected_fee=_find_header_name(headers, ["expectedfeeamount", "expectedfee", "fee", "fees"], ordered_headers),
         payment_period=_find_header_name(headers, ["paymentperiod", "period", "cycle", "paymentcycle"], ordered_headers),
         joined_date=_find_header_name(headers, ["joineddate", "datejoined", "joindate", "admissiondate"], ordered_headers),
+        billing_start_period=_find_header_name(headers, ["start", "startmonth", "startperiod", "periodstart"], ordered_headers),
+        billing_end_period=_find_header_name(headers, ["end", "endmonth", "endperiod", "periodend"], ordered_headers),
     )
 
 
@@ -224,6 +228,26 @@ def _parse_batch_start_month(value: str) -> int:
     raise HTTPException(status_code=422, detail="batch_start_month must be a month name like May or a number 1-12")
 
 
+def _parse_month_value(value: object, field_name: str) -> int:
+    if value is None:
+        raise ValueError(f"{field_name} is required")
+    if isinstance(value, (datetime, date)):
+        return value.month
+    text = str(value).strip()
+    if text == "":
+        raise ValueError(f"{field_name} is required")
+    if text.isdigit():
+        month_number = int(text)
+        if 1 <= month_number <= 12:
+            return month_number
+    normalized = text.lower()
+    for month_number in range(1, 13):
+        full_name = month_name[month_number].lower()
+        if normalized in {full_name, full_name[:3]}:
+            return month_number
+    raise ValueError(f"{field_name} must be a month name like Jun or a number 1-12")
+
+
 @router.post("/import/preview", response_model=StudentImportPreviewRead)
 async def preview_students_import(
     _: User = Depends(require_admin_user),
@@ -263,7 +287,7 @@ async def import_students_from_excel(
     file: UploadFile = FastAPIFile(...),
     mapping_json: str | None = Form(default=None),
     batch: str = Form(...),
-    batch_start_month: str = Form(...),
+    batch_start_month: str | None = Form(default=None),
     mode: str = Query("upsert", pattern="^(upsert|create_only)$"),
     atomic: bool = Query(True),
 ) -> StudentImportResult:
@@ -274,7 +298,7 @@ async def import_students_from_excel(
     data = await file.read()
     _, rows, ordered_headers, headers = _read_workbook(data)
     normalized_batch = _validate_batch(batch)
-    normalized_batch_start_month = _parse_batch_start_month(batch_start_month)
+    normalized_batch_start_month = _parse_batch_start_month(batch_start_month) if batch_start_month else None
     if mapping_json:
         try:
             mapping = StudentImportMapping.model_validate(json.loads(mapping_json))
@@ -303,6 +327,8 @@ async def import_students_from_excel(
     fee_col = mapped_col(mapping.expected_fee)
     payment_period_col = mapped_col(mapping.payment_period)
     joined_date_col = mapped_col(mapping.joined_date)
+    billing_start_col = mapped_col(mapping.billing_start_period)
+    billing_end_col = mapped_col(mapping.billing_end_period)
 
     created = 0
     updated = 0
@@ -332,12 +358,16 @@ async def import_students_from_excel(
             class_name, section = _split_class_and_section(class_raw)
             payment_period_val = cell(payment_period_col)
             payment_period = "" if payment_period_val is None else str(payment_period_val).strip()
+            billing_start_cell = cell(billing_start_col)
+            billing_end_cell = cell(billing_end_col)
 
             fee_cell = cell(fee_col) if fee_col is not None else None
             fee_cell_empty = fee_cell is None or str(fee_cell).strip() == ""
             joined_date_cell = cell(joined_date_col)
             joined_date_empty = joined_date_cell is None or str(joined_date_cell).strip() == ""
-            if student_code == "" and name == "" and (class_name is None) and fee_cell_empty and payment_period == "" and joined_date_empty:
+            billing_start_empty = billing_start_cell is None or str(billing_start_cell).strip() == ""
+            billing_end_empty = billing_end_cell is None or str(billing_end_cell).strip() == ""
+            if student_code == "" and name == "" and (class_name is None) and fee_cell_empty and payment_period == "" and joined_date_empty and billing_start_empty and billing_end_empty:
                 continue  # empty-ish row
 
             if student_code == "":
@@ -351,6 +381,16 @@ async def import_students_from_excel(
                 continue
             if payment_period == "":
                 errors.append({"row": row_index, "error": "payment_period is required"})
+                continue
+            try:
+                billing_start_month = _parse_month_value(billing_start_cell, "billing_start_period")
+            except ValueError as exc:
+                errors.append({"row": row_index, "error": str(exc)})
+                continue
+            try:
+                billing_end_month = _parse_month_value(billing_end_cell, "billing_end_period")
+            except ValueError as exc:
+                errors.append({"row": row_index, "error": str(exc)})
                 continue
 
             try:
@@ -386,6 +426,8 @@ async def import_students_from_excel(
                 student.joined_date = joined_date
                 student.batch = normalized_batch
                 student.batch_start_month = normalized_batch_start_month
+                student.billing_start_month = billing_start_month
+                student.billing_end_month = billing_end_month
                 updated += 1
             else:
                 student = Student(
@@ -398,6 +440,8 @@ async def import_students_from_excel(
                     joined_date=joined_date,
                     batch=normalized_batch,
                     batch_start_month=normalized_batch_start_month,
+                    billing_start_month=billing_start_month,
+                    billing_end_month=billing_end_month,
                 )
                 db.add(student)
                 db.flush()
@@ -531,6 +575,8 @@ def list_student_balances(
                 joined_date=student.joined_date,
                 batch=student.batch,
                 status=student.status,
+                billing_start_month=student.billing_start_month,
+                billing_end_month=student.billing_end_month,
                 expected_fee=overview.monthly_fee,
                 paid_total=paid_total,
                 pending=pending_amount(overview),
@@ -562,6 +608,8 @@ def create_student(
         joined_date=payload.joined_date,
         batch=payload.batch,
         batch_start_month=payload.batch_start_month,
+        billing_start_month=payload.billing_start_month,
+        billing_end_month=payload.billing_end_month,
     )
     student.fee = StudentFee(expected_fee_amount=0)
     db.add(student)

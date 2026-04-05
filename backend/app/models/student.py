@@ -21,6 +21,8 @@ class Student(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     joined_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     batch: Mapped[str | None] = mapped_column(String(20), nullable=True)
     batch_start_month: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    billing_start_month: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    billing_end_month: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[StudentStatus] = mapped_column(
         Enum(StudentStatus, name="student_status"), nullable=False, default=StudentStatus.active
     )
