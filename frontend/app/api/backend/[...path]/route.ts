@@ -32,6 +32,10 @@ async function handler(req: NextRequest, ctx: { params: { path: string[] } }) {
     body: reqBody
   });
 
+  if (res.status === 204) {
+    return new NextResponse(null, { status: 204 });
+  }
+
   const contentType = res.headers.get('content-type') ?? '';
   const isJson = contentType.includes('application/json');
   const resBody = isJson ? await res.text() : await res.arrayBuffer();

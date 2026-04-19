@@ -8,19 +8,24 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models.enums import StudentStatus
 from app.models.payment import Payment
 from app.models.student import Student
+from app.models.student_billing_period import StudentBillingPeriod
 from app.models.user import User
 from app.services.billing import fee_period_label, get_student_billing_overview, pending_amount
 from app.services.billing import normalize_month
 
-
 router = APIRouter()
+
+_BILLING_OPTS = [
+    selectinload(Student.fee),
+    selectinload(Student.billing_periods).selectinload(StudentBillingPeriod.payment),
+]
 
 
 def _csv_response(filename: str, rows: list[list[str]]) -> Response:
@@ -110,22 +115,30 @@ def export_pending_csv(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> Response:
-    students = db.execute(select(Student).order_by(Student.student_code)).scalars().all()
+    students = db.execute(select(Student).order_by(Student.student_code).options(*_BILLING_OPTS)).scalars().all()
+
+    student_ids = [s.id for s in students]
+    paid_totals: dict = {}
+    if student_ids:
+        paid_rows = db.execute(
+            select(Payment.student_id, func.coalesce(func.sum(Payment.amount), 0))
+            .where(Payment.student_id.in_(student_ids))
+            .group_by(Payment.student_id)
+        ).all()
+        paid_totals = {sid: total for sid, total in paid_rows}
+
     rows_data = []
     for student in students:
         overview = get_student_billing_overview(db, student)
         pending_value = pending_amount(overview)
         if pending_value == 0:
             continue
-        paid_total = db.execute(
-            select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.student_id == student.id)
-        ).scalar_one()
         rows_data.append(
             {
                 "student_code": student.student_code,
                 "name": student.name,
                 "expected_fee": overview.monthly_fee,
-                "paid_total": paid_total,
+                "paid_total": paid_totals.get(student.id, 0),
                 "pending": pending_value,
             }
         )
@@ -164,7 +177,7 @@ def export_monthly_students_csv(
         )
     if class_code:
         stmt = stmt.where(Student.student_code.like(f"{class_code.strip()}%"))
-    students = db.execute(stmt).scalars().all()
+    students = db.execute(stmt.options(*_BILLING_OPTS)).scalars().all()
     rows_data: list[list[str]] = []
     for student in students:
         overview = get_student_billing_overview(db, student)

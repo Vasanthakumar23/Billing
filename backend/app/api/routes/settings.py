@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -31,6 +32,7 @@ from app.services.billing import cycle_months_for, get_billing_settings
 router = APIRouter()
 
 RESET_CONFIRMATION_TEXT = "DELETE ALL DATA"
+logger = logging.getLogger(__name__)
 
 
 @router.get("/billing", response_model=BillingSettingsRead)
@@ -101,6 +103,10 @@ def reset_database_route(
         settings.updated_by = current_user.id
 
         db.commit()
+        logger.warning(
+            "DATABASE RESET by user=%s: students=%d payments=%d periods=%d fees=%d",
+            current_user.id, students_deleted, payments_deleted, billing_periods_deleted, fee_records_deleted,
+        )
     except Exception:
         db.rollback()
         raise

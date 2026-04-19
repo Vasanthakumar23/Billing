@@ -252,15 +252,21 @@ def get_student_billing_overview(
     cycle_label = payment_period_label(student.payment_period)
     payable_amount = monthly_fee * Decimal(cycle_months)
     batch_start, batch_end = batch_range_for(student)
-    rows = (
-        db.execute(
-            select(StudentBillingPeriod)
-            .where(StudentBillingPeriod.student_id == student.id)
-            .order_by(StudentBillingPeriod.period_month)
+
+    # Use already-loaded relationship if available, otherwise query
+    if student.billing_periods is not None:
+        rows = sorted(student.billing_periods, key=lambda r: r.period_month)
+    else:
+        rows = (
+            db.execute(
+                select(StudentBillingPeriod)
+                .where(StudentBillingPeriod.student_id == student.id)
+                .order_by(StudentBillingPeriod.period_month)
+            )
+            .scalars()
+            .all()
         )
-        .scalars()
-        .all()
-    )
+
     paid_map = {
         normalize_month(row.period_month): row
         for row in rows

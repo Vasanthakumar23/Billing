@@ -345,3 +345,41 @@ def test_hard_delete_fails_when_payment_history_exists(client):
 
     assert deleted.status_code == 409
     assert "payment history" in deleted.json()["detail"].lower()
+
+
+def test_savings_entries_support_negative_values_and_retraction(client):
+    headers = auth_header(client)
+    student = client.post("/api/students", json={"student_code": "S016", "name": "Kavi"}, headers=headers)
+    student_id = student.json()["id"]
+
+    add = client.post(
+        "/api/savings",
+        json={"student_id": student_id, "student_code": "S016", "amount": 500, "mode": "cash", "notes": "Initial savings"},
+        headers=headers,
+    )
+    minus = client.post(
+        "/api/savings",
+        json={"student_id": student_id, "student_code": "S016", "amount": -100, "mode": "cash", "notes": "Student withdrew"},
+        headers=headers,
+    )
+
+    assert add.status_code == 201
+    assert minus.status_code == 201
+    assert Decimal(minus.json()["amount"]) == Decimal("-100")
+
+    balances = client.get("/api/savings/balances?search=S016", headers=headers)
+    assert balances.status_code == 200
+    assert Decimal(balances.json()["items"][0]["total_savings"]) == Decimal("400")
+
+    retract = client.post(
+        f"/api/savings/{minus.json()['id']}/retract",
+        json={"reason": "Wrong entry"},
+        headers=headers,
+    )
+    assert retract.status_code == 201
+    assert Decimal(retract.json()["amount"]) == Decimal("100")
+    assert retract.json()["is_retraction"] is True
+
+    balances_after = client.get("/api/savings/balances?search=S016", headers=headers)
+    assert balances_after.status_code == 200
+    assert Decimal(balances_after.json()["items"][0]["total_savings"]) == Decimal("500")

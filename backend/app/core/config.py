@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     receipt_prefix: str = "FEE-"
 
     jwt_algorithm: str = "HS256"
-    jwt_access_token_exp_minutes: int = 60 * 24
+    jwt_access_token_exp_minutes: int = 60 * 2  # 2 hours
 
     @field_validator("database_url")
     @classmethod

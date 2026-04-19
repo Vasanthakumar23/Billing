@@ -5,18 +5,24 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models.enums import StudentStatus
 from app.models.payment import Payment
 from app.models.student import Student
+from app.models.student_billing_period import StudentBillingPeriod
 from app.models.user import User
 from app.services.billing import get_student_billing_overview, normalize_month, pending_amount
 
 
 router = APIRouter()
+
+_BILLING_OPTS = [
+    selectinload(Student.fee),
+    selectinload(Student.billing_periods).selectinload(StudentBillingPeriod.payment),
+]
 
 
 @router.get("/summary", response_model=dict)
@@ -55,7 +61,7 @@ def summary(
         .where(Payment.paid_at < next_month_start)
     ).scalar_one()
 
-    students = db.execute(select(Student)).scalars().all()
+    students = db.execute(select(Student).options(*_BILLING_OPTS)).scalars().all()
     paid_students = 0
     unpaid_students = 0
     pending_total = Decimal("0")
@@ -93,23 +99,31 @@ def pending(
     stmt = select(Student)
     if status is not None:
         stmt = stmt.where(Student.status == status)
-    rows = db.execute(stmt.order_by(Student.student_code)).scalars().all()
+    rows = db.execute(stmt.order_by(Student.student_code).options(*_BILLING_OPTS)).scalars().all()
+
+    student_ids = [s.id for s in rows]
+    paid_totals: dict = {}
+    if student_ids:
+        paid_rows = db.execute(
+            select(Payment.student_id, func.coalesce(func.sum(Payment.amount), 0))
+            .where(Payment.student_id.in_(student_ids))
+            .group_by(Payment.student_id)
+        ).all()
+        paid_totals = {sid: total for sid, total in paid_rows}
+
     items = []
     for student in rows:
         overview = get_student_billing_overview(db, student)
         pending_value = pending_amount(overview)
         if pending_value == 0:
             continue
-        paid_total = db.execute(
-            select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.student_id == student.id)
-        ).scalar_one()
         items.append(
             {
                 "student_id": student.id,
                 "student_code": student.student_code,
                 "name": student.name,
                 "expected_fee": str(overview.monthly_fee),
-                "paid_total": str(paid_total),
+                "paid_total": str(paid_totals.get(student.id, 0)),
                 "pending": str(pending_value),
             }
         )
@@ -135,7 +149,7 @@ def monthly_students(
         )
     if class_code:
         stmt = stmt.where(Student.student_code.like(f"{class_code.strip()}%"))
-    students = db.execute(stmt).scalars().all()
+    students = db.execute(stmt.options(*_BILLING_OPTS)).scalars().all()
     items: list[dict] = []
     for student in students:
         overview = get_student_billing_overview(db, student)
